@@ -31,6 +31,10 @@ repositories {
         name = "CodeMC"
         url = uri("https://repo.codemc.org/repository/maven-public/")
     }
+    maven {
+        name = "JitPack"
+        url = uri("https://jitpack.io")
+    }
 }
 
 dependencies {
