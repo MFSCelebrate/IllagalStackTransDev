@@ -21,8 +21,7 @@ repositories {
         url = uri("https://repo.papermc.io/repository/maven-public/")
     }
     maven {
-           name = "ProtocolLib"
-           url = uri("https://repo.dmulloy2.net/repository/public/")
+        url = uri("https://repo.dmulloy2.net/repository/public/")
     }
     maven {
         name = "Magic"
@@ -31,10 +30,6 @@ repositories {
     maven {
         name = "CodeMC"
         url = uri("https://repo.codemc.org/repository/maven-public/")
-    }
-    maven {
-        name = "JitPack"
-        url = uri("https://jitpack.io")
     }
 }
 
