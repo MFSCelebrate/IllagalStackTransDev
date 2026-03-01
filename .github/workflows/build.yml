@@ -27,7 +27,7 @@ jobs:
 
       # 3. 使用 Gradle 官方缓存/设置 action (会自动处理 wrapper 验证和缓存)
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/actions/setup-gradle@v5
 
       # 4. 确保 Gradle Wrapper 有执行权限 (Linux 环境必需)
       - name: Make gradlew executable
