@@ -20,10 +20,10 @@ repositories {
         name = "PaperMC"
         url = uri("https://repo.papermc.io/repository/maven-public/")
     }
-maven {
-           url "https://repo.dmulloy2.net/repository/public/"
-       }
-    
+    maven {
+           name = "ProtocolLib"
+           url = uri("https://repo.dmulloy2.net/repository/public/")
+    }
     maven {
         name = "Magic"
         url = uri("https://maven.elmakers.com/repository/")
