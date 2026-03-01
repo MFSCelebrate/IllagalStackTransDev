@@ -1,0 +1,45 @@
+name: Build Plugin with Gradle (JDK 21)
+
+# 触发条件：当推送到 main/master 分支，或有人提 PR 到这些分支时运行
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  # 允许手动触发
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. 检出代码
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. 设置 JDK 21 —— 这里是针对 1.21+ 的关键修改
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'        # 采用 Eclipse Temurin 发行版
+          java-version: '21'              # 版本从 17 改为 21
+
+      # 3. 使用 Gradle 官方缓存/设置 action (会自动处理 wrapper 验证和缓存)
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      # 4. 确保 Gradle Wrapper 有执行权限 (Linux 环境必需)
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      # 5. 执行构建 (你可以根据需要添加其它参数，比如 -x test 跳过测试)
+      - name: Build with Gradle
+        run: ./gradlew build
+
+      # 6. 上传生成的 JAR 文件作为构建产物
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-jar-gradle-jdk21
+          path: build/libs/*.jar   # Gradle 默认输出目录
