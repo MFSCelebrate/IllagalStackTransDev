@@ -20,7 +20,10 @@ repositories {
         name = "PaperMC"
         url = uri("https://repo.papermc.io/repository/maven-public/")
     }
-    
+    maven {
+        name = "ProtocolLib"
+        url = uri("https://repo.dmulloy2.net/nexus/repository/public/")
+    }
     maven {
         name = "Magic"
         url = uri("https://maven.elmakers.com/repository/")
@@ -37,7 +40,7 @@ repositories {
 
 dependencies {
     compileOnly("dev.folia:folia-api:1.20.4-R0.1-SNAPSHOT")
-    compileOnly(files("libs/ProtocolLib-5.4.0.jar"))
+    compileOnly("com.comphenix.protocol:ProtocolLib:5.0.0")
     compileOnly("com.elmakers.mine.bukkit:MagicAPI:10.2")
     compileOnly("de.tr7zw:item-nbt-api-plugin:2.8.0")
     compileOnly("com.github.TheBusyBiscuit:Slimefun4:RC-30") { isTransitive = false }
