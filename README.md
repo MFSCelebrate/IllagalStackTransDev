@@ -1,14 +1,18 @@
-# IllegalStack
-A spigot based plugin dedicated to fixing glitches and exploits that have made it into final Minecraft releases.
+# IllegalStackTrans
+中文翻译在下面
 
-## Links
-(NOTE: CONCERNING CUSTOM OR UNRELEASED OR SPECIAL BUILDS OR JARS.  THE ONLY PLACE YOU SHOULD EVER DOWNLOAD THIS OR ANY OTHER PLUGIN IS DIRECTLY FROM THE AUTHORS LINKS.  NEVER TRUST SOMEONE THAT RANDOMLY MESSAGES YOU OR JOINS YOUR SERVER CLAIMING TO HAVE A NEW VERSION AS IT WILL LIKELY CONTAIN MALICIOUS CODE TO TAKE OVER OR DESTROY YOUR SERVER!)
-- [Spigot](https://www.spigotmc.org/resources/dupe-fixes-illegal-stack-remover.44411/) <- OFFICIAL DOWNLOAD LINK
-- [Wiki](https://github.com/dniym/IllegalStack/wiki/FAQ)
-- [Discord](https://discord.gg/Gsx4QaT)
+Warning: This plugin is a Chinese translation of the IllagalStack plugin, and the release version may be unstable. Use with caution!
+Support the original author of IllagalStack:
 
-## Building this project
+Discord:  https://discord.gg/Gsx4QaT
+Wiki:     https://github.com/dniym/IllegalStack/wiki/FAQ
+SpigotMC: https://www.spigotmc.org/resources/dupe-fixes-illegal-stack-remover.44411/
 
-Gradle is the recommended way to build the project. Use `./gradlew clean build` in the main project directory to build the 
-project.
-The output is located at `/build/libs/IllegalStack.jar`.
+//====================================================================================//
+
+警告: 此插件是 IllagalStack 的中文翻译版本，这个预发布版本有不稳定性，谨慎使用！
+支持一下 IllagalStack 的原作者:
+
+DC:       https://discord.gg/Gsx4QaT
+Wiki:     https://github.com/dniym/IllegalStack/wiki/FAQ
+SpigotMC: https://www.spigotmc.org/resources/dupe-fixes-illegal-stack-remover.44411/
