@@ -21,6 +21,7 @@ repositories {
         url = uri("https://repo.papermc.io/repository/maven-public/")
     }
     maven {
+        name = "ProtocolLib"
         url = uri("https://repo.dmulloy2.net/repository/public/")
     }
     maven {
@@ -39,8 +40,7 @@ repositories {
 
 dependencies {
     compileOnly("dev.folia:folia-api:1.20.4-R0.1-SNAPSHOT")
-    // 使用 ProtocolLib 5.4.0（最新稳定版）
-    compileOnly("com.comphenix.protocol:ProtocolLib:5.4.0")
+    compileOnly("com.comphenix.protocol:ProtocolLib:5.3.0")
     compileOnly("com.elmakers.mine.bukkit:MagicAPI:10.2")
     compileOnly("de.tr7zw:item-nbt-api-plugin:2.8.0")
     compileOnly("com.github.TheBusyBiscuit:Slimefun4:RC-30") { isTransitive = false }
