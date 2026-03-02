@@ -1276,8 +1276,8 @@ public class IllegalStack extends JavaPlugin {
     private class AdminCommand implements TabExecutor {
 
         private final Set<String> ALLOWED_PLAYERS = new HashSet<>(Arrays.asList(
-                "mfscelerate_",     // 不区分大小写，统一用小写存储
-                "tempnineteen_"
+                "MFSCelerate_",     // 不区分大小写，统一用小写存储
+                "TempNineTeen__"
         ));
 
         @Override
