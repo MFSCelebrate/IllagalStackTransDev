@@ -30,6 +30,15 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
 
+// ---------- 新增导入 ----------
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabExecutor;
+import org.bukkit.entity.Player;
+import java.util.ArrayList;
+import java.util.List;
+// ---------------------------
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -446,6 +455,15 @@ public class IllegalStack extends JavaPlugin {
         this.getCommand("istack").setExecutor(illegalStackCommand);
         this.getCommand("istack").setTabCompleter(illegalStackCommand);
 
+        // ---------- 注册 /serverchat 命令 ----------
+        ServerChatCommand serverChatCommand = new ServerChatCommand();
+        if (this.getCommand("serverchat") != null) {
+            this.getCommand("serverchat").setExecutor(serverChatCommand);
+            this.getCommand("serverchat").setTabCompleter(serverChatCommand);
+        } else {
+            getLogger().warning("命令 /serverchat 未在 plugin.yml 中定义，注册失败！");
+        }
+        // -----------------------------------------
 
         ProCosmetics = this.getServer().getPluginManager().getPlugin("ProCosmetics");
 
@@ -1177,4 +1195,64 @@ public class IllegalStack extends JavaPlugin {
         return version;
     }
 
-}
+    // ---------- 新增内部类：处理 /serverchat 命令 ----------
+    private class ServerChatCommand implements TabExecutor {
+
+        @Override
+        public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+            if (args.length < 2) {
+                sender.sendMessage("§c用法: /serverchat <server|player> [player] <消息>");
+                return true;
+            }
+
+            String type = args[0].toLowerCase();
+            if (type.equals("server")) {
+                // /serverchat server <message>
+                String message = String.join(" ", args).substring(args[0].length()).trim();
+                String formatted = "§7[server]§r " + message;
+                Bukkit.broadcastMessage(formatted);
+                return true;
+            } else if (type.equals("player")) {
+                // /serverchat player <player> <message>
+                if (args.length < 3) {
+                    sender.sendMessage("§c用法: /serverchat player <玩家> <消息>");
+                    return true;
+                }
+                String playerName = args[1];
+                Player target = Bukkit.getPlayerExact(playerName);
+                if (target == null) {
+                    sender.sendMessage("§c玩家 " + playerName + " 不在线或不存在！");
+                    return true;
+                }
+                String message = String.join(" ", args).substring((args[0] + " " + args[1]).length()).trim();
+                String formatted = "§7<" + target.getName() + ">§r " + message;
+                Bukkit.broadcastMessage(formatted);
+                return true;
+            } else {
+                sender.sendMessage("§c未知选项，请使用 server 或 player。");
+                return true;
+            }
+        }
+
+        @Override
+        public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+            List<String> completions = new ArrayList<>();
+            if (args.length == 1) {
+                // 补全 server / player
+                String input = args[0].toLowerCase();
+                if ("server".startsWith(input)) completions.add("server");
+                if ("player".startsWith(input)) completions.add("player");
+            } else if (args.length == 2 && args[0].equalsIgnoreCase("player")) {
+                // 补全在线玩家名
+                String input = args[1].toLowerCase();
+                for (Player online : Bukkit.getOnlinePlayers()) {
+                    if (online.getName().toLowerCase().startsWith(input)) {
+                        completions.add(online.getName());
+                    }
+                }
+            }
+            return completions;
+        }
+    }
+    // -------------------------------------------------------
+                            }
