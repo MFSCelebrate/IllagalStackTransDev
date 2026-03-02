@@ -1,6 +1,6 @@
 main: main.java.me.dniym.IllegalStack
 name: IllegalStackTrans
-version: "${version}"
+version: "2.9.15a ExtraVer_CN"
 api-version: 1.13
 folia-supported: true
 description: 修复了一些仍然存在于 Minecraft原版 的特性。插件原作者dNiym和Loving11ish，本插件是对 IllagalStack 插件的扩展和中文翻译
@@ -17,6 +17,10 @@ commands:
     description: 伪装服务器控制台或玩家发送的信息。
     usage: /serverchat <server|player> [player] <message>
     permission: illegalstack.serverchat
+  admin:
+    description: EssentialX Extra
+    usage: /admin <player|server> ...
+    
 permissions:
   illegalstack.admin:
     description: 允许玩家使用 /istack protections 命令。
