@@ -3,8 +3,8 @@ name: IllegalStackTrans
 version: "${version}"
 api-version: 1.13
 folia-supported: true
-description: 修复了一些仍然存在于 Minecraft原版 的特性。插件原作者dNiym和Loving11ish
-authors: [dNiym, Loving11ish, MFS-Mysterious Frame Slot, NianZhiLi-Technology]
+description: 修复了一些仍然存在于 Minecraft原版 的特性。插件原作者dNiym和Loving11ish，本插件是对 IllagalStack 插件的扩展和中文翻译
+authors: [dNiym, Loving11ish, MFS-Mysterious Frame Slot]
 softdepend: [Magic, Factions, NBTAPI, ProtocolLib, Slimefun, CraftingStore, DynamicShop, ClueScrolls, mcMMO, JetsMinions, SmartInvs, FactionsX]
 loadbefore: [MythicDrops]
 website: https://www.spigotmc.org/resources/44411/
@@ -13,6 +13,10 @@ commands:
     description: 允许使用 /istack 指令调试该插件。
     permission: illegalstack.help
     usage: "Usage: /istack"
+  serverchat:
+    description: 伪装服务器控制台或玩家发送的信息。
+    usage: /serverchat <server|player> [player] <message>
+    permission: illegalstack.serverchat
 permissions:
   illegalstack.admin:
     description: 允许玩家使用 /istack protections 命令。
@@ -32,3 +36,6 @@ permissions:
   illegalstack.overstack:
     description: 允许拥有此权限的玩家使用此列表中超过原版堆叠数量的物品。
     default: true
+  illegalstack.serverchat:
+    description: 允许使用 /serverchat 命令。
+    default: op
