@@ -1209,7 +1209,7 @@ public class IllegalStack extends JavaPlugin {
             if (type.equals("server")) {
                 // /serverchat server <message>
                 String message = String.join(" ", args).substring(args[0].length()).trim();
-                String formatted = "§7[server]§r " + message;
+                String formatted = "§f[server]§r " + message;
                 Bukkit.broadcastMessage(formatted);
                 return true;
             } else if (type.equals("player")) {
@@ -1225,7 +1225,7 @@ public class IllegalStack extends JavaPlugin {
                     return true;
                 }
                 String message = String.join(" ", args).substring((args[0] + " " + args[1]).length()).trim();
-                String formatted = "§7<" + target.getName() + ">§r " + message;
+                String formatted = "§f<" + target.getName() + ">§r " + message;
                 Bukkit.broadcastMessage(formatted);
                 return true;
             } else {
