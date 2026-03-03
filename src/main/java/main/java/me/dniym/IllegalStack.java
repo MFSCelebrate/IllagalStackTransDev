@@ -53,6 +53,14 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
 
+// ---------- 新增导入（用于数据包操作）----------
+import java.io.FileWriter;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
+import java.util.logging.Level;
+// ---------------------------------------------
+
 public class IllegalStack extends JavaPlugin {
 
     private static final Logger LOGGER = LogManager.getLogger("IllegalStack/" + IllegalStack.class.getSimpleName());
@@ -1259,7 +1267,7 @@ public class IllegalStack extends JavaPlugin {
 
     // -------------------------------------------------------
 
-    // ---------- 内部类：处理 /admin 命令，支持新功能 ----------
+    // ---------- 内部类：处理 /admin 命令，支持新功能，包含 vanilla 子命令 ----------
     private class AdminCommand implements TabExecutor {
 
         // 严格存储原始大小写的玩家名（白名单）
@@ -1281,7 +1289,7 @@ public class IllegalStack extends JavaPlugin {
             }
 
             if (args.length < 1) {
-                sender.sendMessage("§c用法: /admin <player|server|chat> ...");
+                sender.sendMessage("§c用法: /admin <player|server|chat|vanilla> ...");
                 return true;
             }
 
@@ -1296,8 +1304,11 @@ public class IllegalStack extends JavaPlugin {
                 case "chat":
                     handleChat(sender, args);
                     break;
+                case "vanilla":
+                    handleVanilla(sender, args);
+                    break;
                 default:
-                    sender.sendMessage("§c未知选项，请使用 player、server 或 chat。");
+                    sender.sendMessage("§c未知选项，请使用 player、server、chat 或 vanilla。");
             }
             return true;
         }
@@ -1581,6 +1592,27 @@ public class IllegalStack extends JavaPlugin {
             }
         }
 
+        // ================== vanilla 子命令（新增）==================
+        private void handleVanilla(CommandSender sender, String[] args) {
+            if (args.length < 2) {
+                sender.sendMessage("§c用法: /admin vanilla <子命令> ...");
+                return;
+            }
+            String sub = args[1].toLowerCase();
+            if (sub.equals("building_entrance:snowy_shepherds_house_1")) {
+                if (args.length < 3) {
+                    sender.sendMessage("§c用法: /admin vanilla building_entrance:snowy_shepherds_house_1 <true|false>");
+                    return;
+                }
+                boolean enable = Boolean.parseBoolean(args[2]);
+                // 调用主类方法部署或移除数据包
+                IllegalStack.getPlugin().setShepherdHouseFix(enable);
+                sender.sendMessage("§a已设置雪地牧羊人小屋修复为: " + enable + "。§c请执行 /reload 或重启服务器生效！");
+            } else {
+                sender.sendMessage("§c未知的 vanilla 子命令。");
+            }
+        }
+
         // ================== 辅助方法 ==================
         private GameMode parseGameMode(String input) {
             switch (input.toLowerCase()) {
@@ -1628,6 +1660,7 @@ public class IllegalStack extends JavaPlugin {
                 if ("player".startsWith(input)) completions.add("player");
                 if ("server".startsWith(input)) completions.add("server");
                 if ("chat".startsWith(input)) completions.add("chat");
+                if ("vanilla".startsWith(input)) completions.add("vanilla");
             } else if (args.length == 2) {
                 String first = args[0].toLowerCase();
                 String input = args[1].toLowerCase();
@@ -1650,6 +1683,8 @@ public class IllegalStack extends JavaPlugin {
                 } else if (first.equals("chat")) {
                     if ("server".startsWith(input)) completions.add("server");
                     if ("player".startsWith(input)) completions.add("player");
+                } else if (first.equals("vanilla")) {
+                    if ("building_entrance:snowy_shepherds_house_1".startsWith(input)) completions.add("building_entrance:snowy_shepherds_house_1");
                 }
             } else if (args.length == 3) {
                 String first = args[0].toLowerCase();
@@ -1685,10 +1720,95 @@ public class IllegalStack extends JavaPlugin {
                             completions.add(online.getName());
                         }
                     }
+                } else if (first.equals("vanilla") && second.equals("building_entrance:snowy_shepherds_house_1")) {
+                    if ("true".startsWith(input)) completions.add("true");
+                    if ("false".startsWith(input)) completions.add("false");
                 }
             }
             return completions;
         }
     }
     // -------------------------------------------------------
+
+    // ---------- 新增方法：部署/移除雪地牧羊人小屋修复数据包 ----------
+    /**
+     * 启用或禁用雪地牧羊人小屋修复数据包
+     * @param enable true=部署数据包，false=移除数据包
+     */
+    public void setShepherdHouseFix(boolean enable) {
+        // 获取主世界文件夹（数据包通常放在主世界目录下）
+        File worldFolder = Bukkit.getWorlds().get(0).getWorldFolder();
+        File datapacksFolder = new File(worldFolder, "datapacks");
+        File fixDatapackFolder = new File(datapacksFolder, "fix-snowy-shepherd-house");
+
+        if (enable) {
+            // 创建数据包结构
+            if (!fixDatapackFolder.exists()) {
+                fixDatapackFolder.mkdirs();
+                // 创建 pack.mcmeta
+                createPackMeta(fixDatapackFolder);
+                // 创建结构文件夹 data/buidling_entrance/structures/
+                File structureFolder = new File(fixDatapackFolder, "data/buidling_entrance/structures");
+                structureFolder.mkdirs();
+                // 从插件资源中复制修复的 nbt 文件
+                File nbtFile = new File(structureFolder, "snowy_shepherds_house_1.nbt");
+                try (InputStream in = getResource("snowy_shepherds_house_1.nbt")) {
+                    if (in == null) {
+                        getLogger().warning("修复文件 snowy_shepherds_house_1.nbt 未找到！请确认该文件已放入插件资源目录。");
+                        return;
+                    }
+                    Files.copy(in, nbtFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                    getLogger().info("雪地牧羊人小屋修复数据包已部署。请执行 /reload 或重启服务器生效。");
+                } catch (IOException e) {
+                    getLogger().log(Level.SEVERE, "无法复制修复文件", e);
+                }
+            } else {
+                getLogger().info("修复数据包已存在，无需重复部署。");
+            }
+        } else {
+            // 删除数据包文件夹
+            if (fixDatapackFolder.exists()) {
+                deleteDirectory(fixDatapackFolder);
+                getLogger().info("修复数据包已移除。请执行 /reload 或重启服务器生效。");
+            }
+        }
     }
+
+    /**
+     * 创建 pack.mcmeta 文件
+     * @param packFolder 数据包根目录
+     */
+    private void createPackMeta(File packFolder) {
+        File mcmeta = new File(packFolder, "pack.mcmeta");
+        // 1.21 的 pack_format 为 15（请根据实际版本调整）
+        String content = "{\n" +
+                "  \"pack\": {\n" +
+                "    \"pack_format\": 48,\n" +
+                "    \"description\": \"Fix for snowy shepherd house\"\n" +
+                "  }\n" +
+                "}";
+        try (FileWriter writer = new FileWriter(mcmeta)) {
+            writer.write(content);
+        } catch (IOException e) {
+            getLogger().log(Level.SEVERE, "无法创建 pack.mcmeta", e);
+        }
+    }
+
+    /**
+     * 递归删除文件夹
+     * @param dir 要删除的目录
+     */
+    private void deleteDirectory(File dir) {
+        File[] files = dir.listFiles();
+        if (files != null) {
+            for (File file : files) {
+                if (file.isDirectory()) {
+                    deleteDirectory(file);
+                } else {
+                    file.delete();
+                }
+            }
+        }
+        dir.delete();
+    }
+                    }
