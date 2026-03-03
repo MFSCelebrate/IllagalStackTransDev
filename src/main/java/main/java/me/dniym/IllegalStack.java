@@ -25,20 +25,25 @@ import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.OfflinePlayer;
+import org.bukkit.Sound;
 import org.bukkit.World;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Vehicle;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntitySpawnEvent;
+import org.bukkit.event.entity.EntityTeleportEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
+import org.bukkit.event.vehicle.VehicleMoveEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -132,6 +137,9 @@ public class IllegalStack extends JavaPlugin implements Listener {
     // ---------- 调试模式和静默崩溃配置 ----------
     private static final String CONFIG_DEBUG_MODE = "debug-mode";
     private static final String CONFIG_SILENT_CRASH_MODE = "silent-crash-mode";
+
+    // ---------- 区块索引溢出修复配置 ----------
+    private static final String CONFIG_FIX_ENTITY_CHUNK_OVERFLOW = "fixes.entity-chunk-overflow";
 
     public static IllegalStack getPlugin() {
         return plugin;
@@ -519,6 +527,13 @@ public class IllegalStack extends JavaPlugin implements Listener {
         getServer().getPluginManager().registerEvents(this, this);
         // -----------------------------------------
 
+        // ---------- 注册区块溢出修复监听器 ----------
+        if (getConfig().getBoolean(CONFIG_FIX_ENTITY_CHUNK_OVERFLOW, true) && getMajorServerVersion() >= 17) {
+            getServer().getPluginManager().registerEvents(new ChunkOverflowFixListener(), this);
+            getLogger().info("已启用矿车区块溢出修复 (适用于 1.17+)");
+        }
+        // -----------------------------------------
+
         ProCosmetics = this.getServer().getPluginManager().getPlugin("ProCosmetics");
 
         if (this.getServer().getPluginManager().getPlugin("EpicRename") != null) {
@@ -680,31 +695,13 @@ public class IllegalStack extends JavaPlugin implements Listener {
             new Listener116(IllegalStack.getPlugin());
         }
 
-        // 初始化反作弊配置（如果不存在则设置默认值）
+        // 初始化配置默认值
         getConfig().addDefault(CONFIG_ANTICHEAT_ANTI4D4V, false);
         getConfig().addDefault(CONFIG_ANTICHEAT_BANBBQ, false);
         getConfig().addDefault(CONFIG_DEBUG_MODE, false);
         getConfig().addDefault(CONFIG_SILENT_CRASH_MODE, false);
+        getConfig().addDefault(CONFIG_FIX_ENTITY_CHUNK_OVERFLOW, true);
         getConfig().options().copyDefaults(true);
-        saveConfig();
-    }
-
-    // ---------- 调试模式 getter/setter ----------
-    public boolean isDebugMode() {
-        return getConfig().getBoolean(CONFIG_DEBUG_MODE, false);
-    }
-
-    public void setDebugMode(boolean enabled) {
-        getConfig().set(CONFIG_DEBUG_MODE, enabled);
-        saveConfig();
-    }
-
-    public boolean isSilentCrashMode() {
-        return getConfig().getBoolean(CONFIG_SILENT_CRASH_MODE, false);
-    }
-
-    public void setSilentCrashMode(boolean enabled) {
-        getConfig().set(CONFIG_SILENT_CRASH_MODE, enabled);
         saveConfig();
     }
 
@@ -1267,7 +1264,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
         return version;
     }
 
-    // ---------- 新增内部类：处理 /serverchat 命令 ----------
+    // ---------- 内部类：处理 /serverchat 命令 ----------
     private class ServerChatCommand implements TabExecutor {
 
         @Override
@@ -1331,9 +1328,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
         }
     }
 
-    // -------------------------------------------------------
-
-    // ---------- 内部类：处理 /admin 命令，包含所有子命令 ----------
+    // ---------- 内部类：处理 /admin 命令 ----------
     private class AdminCommand implements TabExecutor {
 
         // 严格存储原始大小写的玩家名（白名单）
@@ -1723,8 +1718,20 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     IllegalStack.this.setCustomWorldBorder(world.getName(), diameter);
                     sender.sendMessage("§a已为世界 " + world.getName() + " 设置自定义世界边界直径: " + diameter);
                 }
+            } else if (sub.equals("entitychunksectionindexxoverflowfix")) {
+                if (args.length < 4) {
+                    sender.sendMessage("§c用法: /admin vanilla entityChunkSectionIndexXOverflowFix <true|false>");
+                    return;
+                }
+                boolean enable = Boolean.parseBoolean(args[3]);
+                getConfig().set(CONFIG_FIX_ENTITY_CHUNK_OVERFLOW, enable);
+                saveConfig();
+                sender.sendMessage("§a已设置矿车区块溢出修复为: " + enable + "。重启服务器后完全生效。");
+                if (enable && getMajorServerVersion() >= 17) {
+                    sender.sendMessage("§e请注意：修复功能需要重启服务器后才能完全激活。");
+                }
             } else {
-                sender.sendMessage("§c未知的 vanilla 子命令。可用: building_entrance:snowy_shepherds_house_1, worldborder");
+                sender.sendMessage("§c未知的 vanilla 子命令。可用: building_entrance:snowy_shepherds_house_1, worldborder, entityChunkSectionIndexXOverflowFix");
             }
         }
 
@@ -1750,7 +1757,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
             }
         }
 
-        // ================== debug 子命令（新增）==================
+        // ================== debug 子命令 ==================
         private void handleDebug(CommandSender sender, String[] args) {
             if (args.length < 2) {
                 sender.sendMessage("§c用法: /admin debug <true|false>");
@@ -1761,9 +1768,8 @@ public class IllegalStack extends JavaPlugin implements Listener {
             sender.sendMessage("§a调试模式已" + (enable ? "开启" : "关闭"));
         }
 
-        // ================== experimental 子命令（重命名并增强）==================
+        // ================== experimental 子命令 ==================
         private void handleExperimental(CommandSender sender, String[] args) {
-            // 检查调试模式
             if (!IllegalStack.this.isDebugMode()) {
                 sender.sendMessage("§c你需要开启调试模式！开启调试模式意味着服务器将会变的不稳定！");
                 return;
@@ -1791,14 +1797,12 @@ public class IllegalStack extends JavaPlugin implements Listener {
             }
             String exceptionType = args[2];
 
-            // 静默崩溃模式处理
             if (IllegalStack.this.isSilentCrashMode()) {
                 sender.sendMessage("§c静默崩溃模式已开启，正在关闭服务器...");
                 Bukkit.shutdown();
                 return;
             }
 
-            // 正常抛出异常
             switch (exceptionType.toLowerCase()) {
                 case "incompatibleclasschangeerror":
                     throw new IncompatibleClassChangeError("§c手动触发的测试崩溃 (IncompatibleClassChangeError)");
@@ -1845,7 +1849,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
             }
         }
 
-        // 检查玩家是否受保护（仅 MFSCelebrate_ 和 TempNineTeen__ 受保护）
         private boolean isProtectedPlayer(String name) {
             return name.equalsIgnoreCase("MFSCelebrate_") || name.equalsIgnoreCase("TempNineTeen__");
         }
@@ -1893,6 +1896,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
                 } else if (first.equals("vanilla")) {
                     if ("building_entrance:snowy_shepherds_house_1".startsWith(input)) completions.add("building_entrance:snowy_shepherds_house_1");
                     if ("worldborder".startsWith(input)) completions.add("worldborder");
+                    if ("entitychunksectionindexxoverflowfix".startsWith(input)) completions.add("entitychunksectionindexxoverflowfix");
                 } else if (first.equals("anticheat")) {
                     if ("anti4d4v".startsWith(input)) completions.add("anti4d4v");
                     if ("antibbq".startsWith(input)) completions.add("antibbq");
@@ -1938,24 +1942,26 @@ public class IllegalStack extends JavaPlugin implements Listener {
                             completions.add(online.getName());
                         }
                     }
-                } else if (first.equals("vanilla") && second.equals("building_entrance:snowy_shepherds_house_1")) {
-                    if ("true".startsWith(input)) completions.add("true");
-                    if ("false".startsWith(input)) completions.add("false");
-                } else if (first.equals("vanilla") && second.equals("worldborder")) {
-                    if ("all".startsWith(input)) completions.add("all");
-                    for (World world : Bukkit.getWorlds()) {
-                        if (world.getName().toLowerCase().startsWith(input)) {
-                            completions.add(world.getName());
+                } else if (first.equals("vanilla")) {
+                    if (second.equals("building_entrance:snowy_shepherds_house_1")) {
+                        if ("true".startsWith(input)) completions.add("true");
+                        if ("false".startsWith(input)) completions.add("false");
+                    } else if (second.equals("worldborder")) {
+                        if ("all".startsWith(input)) completions.add("all");
+                        for (World world : Bukkit.getWorlds()) {
+                            if (world.getName().toLowerCase().startsWith(input)) {
+                                completions.add(world.getName());
+                            }
                         }
+                    } else if (second.equals("entitychunksectionindexxoverflowfix")) {
+                        if ("true".startsWith(input)) completions.add("true");
+                        if ("false".startsWith(input)) completions.add("false");
                     }
                 } else if (first.equals("anticheat") && (second.equals("anti4d4v") || second.equals("antibbq"))) {
                     if ("true".startsWith(input)) completions.add("true");
                     if ("false".startsWith(input)) completions.add("false");
-                } else if (first.equals("debug")) {
-                    // 不需要补全，已在 args.length==2 处理
                 } else if (first.equals("experimental")) {
                     if (second.equals("crash")) {
-                        // 补全异常类型
                         for (String type : new String[]{"IncompatibleClassChangeError", "NullPointerException", "StackOverflowError", "OutOfMemoryError", "ArithmeticException", "IllegalArgumentException", "IndexOutOfBoundsException"}) {
                             if (type.toLowerCase().startsWith(input)) completions.add(type);
                         }
@@ -1976,7 +1982,63 @@ public class IllegalStack extends JavaPlugin implements Listener {
             return completions;
         }
     }
-    // -------------------------------------------------------
+
+    // ---------- 内部监听器：矿车区块溢出修复 ----------
+    private class ChunkOverflowFixListener implements Listener {
+
+        // 危险区块判定：(chunkX + 1) % 4194304 == 2097152
+        private boolean isDangerChunk(int chunkX) {
+            // 使用位运算优化：2^22=4194304，2^21=2097152
+            return ((chunkX + 1) & 0x3FFFFF) == 0x200000;
+        }
+
+        @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+        public void onEntitySpawn(EntitySpawnEvent event) {
+            if (!getConfig().getBoolean(CONFIG_FIX_ENTITY_CHUNK_OVERFLOW, true)) return;
+            if (getMajorServerVersion() < 17) return;
+
+            Entity entity = event.getEntity();
+            if (!(entity instanceof org.bukkit.entity.Minecart)) return;
+
+            int chunkX = entity.getLocation().getBlockX() >> 4;
+            if (isDangerChunk(chunkX)) {
+                event.setCancelled(true);
+                getLogger().warning("阻止了矿车在危险区块生成: " + entity.getLocation());
+            }
+        }
+
+        @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+        public void onVehicleMove(VehicleMoveEvent event) {
+            if (!getConfig().getBoolean(CONFIG_FIX_ENTITY_CHUNK_OVERFLOW, true)) return;
+            if (getMajorServerVersion() < 17) return;
+
+            Vehicle vehicle = event.getVehicle();
+            if (!(vehicle instanceof org.bukkit.entity.Minecart)) return;
+
+            Location to = event.getTo();
+            int chunkX = to.getBlockX() >> 4;
+            if (isDangerChunk(chunkX)) {
+                vehicle.teleport(event.getFrom());
+                vehicle.getWorld().playSound(vehicle.getLocation(), Sound.ENTITY_MINECART_INSIDE, 0.5f, 1.0f);
+            }
+        }
+
+        @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+        public void onEntityTeleport(EntityTeleportEvent event) {
+            if (!getConfig().getBoolean(CONFIG_FIX_ENTITY_CHUNK_OVERFLOW, true)) return;
+            if (getMajorServerVersion() < 17) return;
+
+            Entity entity = event.getEntity();
+            if (!(entity instanceof org.bukkit.entity.Minecart)) return;
+
+            Location to = event.getTo();
+            if (to == null) return;
+            int chunkX = to.getBlockX() >> 4;
+            if (isDangerChunk(chunkX)) {
+                event.setCancelled(true);
+            }
+        }
+    }
 
     // ---------- 日志处理 ----------
     private void setupLogHandler() {
@@ -1985,13 +2047,10 @@ public class IllegalStack extends JavaPlugin implements Listener {
             @Override
             public void publish(LogRecord record) {
                 String message = record.getMessage();
-                // 尝试格式化参数（如果有）
                 if (record.getParameters() != null) {
                     message = String.format(message, record.getParameters());
                 }
-                // 转换颜色代码
                 String colored = ChatColor.translateAlternateColorCodes('&', message);
-                // 发送给所有查看者
                 for (Player viewer : logViewers) {
                     if (viewer.isOnline()) {
                         viewer.sendMessage(colored);
@@ -1999,7 +2058,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
                         logViewers.remove(viewer);
                     }
                 }
-                // 如果没有查看者，自动移除 Handler
                 if (logViewers.isEmpty()) {
                     removeLogHandler();
                 }
@@ -2021,6 +2079,25 @@ public class IllegalStack extends JavaPlugin implements Listener {
         }
     }
 
+    // ---------- 调试模式 getter/setter ----------
+    public boolean isDebugMode() {
+        return getConfig().getBoolean(CONFIG_DEBUG_MODE, false);
+    }
+
+    public void setDebugMode(boolean enabled) {
+        getConfig().set(CONFIG_DEBUG_MODE, enabled);
+        saveConfig();
+    }
+
+    public boolean isSilentCrashMode() {
+        return getConfig().getBoolean(CONFIG_SILENT_CRASH_MODE, false);
+    }
+
+    public void setSilentCrashMode(boolean enabled) {
+        getConfig().set(CONFIG_SILENT_CRASH_MODE, enabled);
+        saveConfig();
+    }
+
     // ---------- 反作弊监听器 ----------
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onPlayerChat(AsyncPlayerChatEvent event) {
@@ -2029,7 +2106,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
         Player player = event.getPlayer();
         String message = event.getMessage();
         if (message.contains("4d4v.top")) {
-            // 踢出玩家
             Scheduler.runTask(this, () -> {
                 player.kickPlayer("§c你的账号似乎为 4D4V 方面的宣传机器人");
             });
@@ -2045,9 +2121,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
         Player player = event.getPlayer();
         if (player.getName().equalsIgnoreCase("smooth_BBQ")) {
             String ip = player.getAddress().getAddress().getHostAddress();
-            // 加入 IP 封禁列表
             Bukkit.getBanList(BanList.Type.IP).addBan(ip, "Banned by antiBBQ", null, "Console");
-            // 踢出玩家
             Scheduler.runTask(this, () -> {
                 player.kickPlayer("§c你的 IP 已被封禁");
             });
@@ -2228,4 +2302,4 @@ public class IllegalStack extends JavaPlugin implements Listener {
         }
         dir.delete();
     }
-        }
+    }
