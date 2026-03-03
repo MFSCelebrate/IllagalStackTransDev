@@ -19,6 +19,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.bukkit.BanList;
 import org.bukkit.Bukkit;
+import org.bukkit.Chunk;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -29,6 +30,11 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -61,7 +67,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.logging.Level;
 // ---------------------------------------------
 
-public class IllegalStack extends JavaPlugin {
+public class IllegalStack extends JavaPlugin implements Listener {
 
     private static final Logger LOGGER = LogManager.getLogger("IllegalStack/" + IllegalStack.class.getSimpleName());
 
@@ -103,6 +109,11 @@ public class IllegalStack extends JavaPlugin {
 //	private static NMSEntityVillager nmsTrader= null;
 
     private ServerVersion serverVersion;
+
+    // ---------- 新增：自定义边界相关 ----------
+    private static final double HARD_LIMIT = 30_000_000D; // 原版第二层级硬限制
+    private static final String CONFIG_CUSTOM_BORDER_ENABLED = "custom-border-enabled";
+    private static final String CONFIG_CUSTOM_BORDER_DIAMETER = "custom-border-diameter";
 
     public static IllegalStack getPlugin() {
         return plugin;
@@ -483,6 +494,13 @@ public class IllegalStack extends JavaPlugin {
             this.getCommand("admin").setTabCompleter(adminCommand);
         } else {
             getLogger().warning("命令 /admin 未在 plugin.yml 中定义，注册失败！");
+        }
+        // -----------------------------------------
+
+        // ---------- 注册自定义边界监听器 ----------
+        getServer().getPluginManager().registerEvents(this, this);
+        if (getConfig().getBoolean(CONFIG_CUSTOM_BORDER_ENABLED, false)) {
+            getLogger().info("自定义世界边界已启用，直径: " + getConfig().getDouble(CONFIG_CUSTOM_BORDER_DIAMETER, 59999968));
         }
         // -----------------------------------------
 
@@ -1608,8 +1626,20 @@ public class IllegalStack extends JavaPlugin {
                 // 调用主类方法部署或移除数据包
                 IllegalStack.getPlugin().setShepherdHouseFix(enable);
                 sender.sendMessage("§a已设置雪地牧羊人小屋修复为: " + enable + "。§c请执行 /reload 或重启服务器生效！");
+            } else if (sub.equals("worldborder")) {
+                if (args.length < 3) {
+                    sender.sendMessage("§c用法: /admin vanilla worldborder <直径>");
+                    return;
+                }
+                try {
+                    double diameter = Double.parseDouble(args[2]);
+                    setCustomWorldBorder(diameter);
+                    sender.sendMessage("§a已设置自定义世界边界直径: " + diameter);
+                } catch (NumberFormatException e) {
+                    sender.sendMessage("§c直径必须是数字！");
+                }
             } else {
-                sender.sendMessage("§c未知的 vanilla 子命令。");
+                sender.sendMessage("§c未知的 vanilla 子命令。可用: building_entrance:snowy_shepherds_house_1, worldborder");
             }
         }
 
@@ -1685,6 +1715,7 @@ public class IllegalStack extends JavaPlugin {
                     if ("player".startsWith(input)) completions.add("player");
                 } else if (first.equals("vanilla")) {
                     if ("building_entrance:snowy_shepherds_house_1".startsWith(input)) completions.add("building_entrance:snowy_shepherds_house_1");
+                    if ("worldborder".startsWith(input)) completions.add("worldborder");
                 }
             } else if (args.length == 3) {
                 String first = args[0].toLowerCase();
@@ -1723,6 +1754,8 @@ public class IllegalStack extends JavaPlugin {
                 } else if (first.equals("vanilla") && second.equals("building_entrance:snowy_shepherds_house_1")) {
                     if ("true".startsWith(input)) completions.add("true");
                     if ("false".startsWith(input)) completions.add("false");
+                } else if (first.equals("vanilla") && second.equals("worldborder")) {
+                    // 可以提示输入数字，但这里不添加补全
                 }
             }
             return completions;
@@ -1783,7 +1816,7 @@ public class IllegalStack extends JavaPlugin {
         // 1.21 的 pack_format 为 15（请根据实际版本调整）
         String content = "{\n" +
                 "  \"pack\": {\n" +
-                "    \"pack_format\": 48,\n" +
+                "    \"pack_format\": 15,\n" +
                 "    \"description\": \"Fix for snowy shepherd house\"\n" +
                 "  }\n" +
                 "}";
@@ -1811,4 +1844,115 @@ public class IllegalStack extends JavaPlugin {
         }
         dir.delete();
     }
-                    }
+
+    // ---------- 新增：自定义世界边界相关方法 ----------
+
+    /**
+     * 设置自定义世界边界（覆盖原版 30M 限制）
+     * @param diameter 直径（方块）
+     */
+    public void setCustomWorldBorder(double diameter) {
+        getConfig().set(CONFIG_CUSTOM_BORDER_ENABLED, true);
+        getConfig().set(CONFIG_CUSTOM_BORDER_DIAMETER, diameter);
+        saveConfig();
+        getLogger().info("自定义世界边界已启用，直径: " + diameter);
+    }
+
+    /**
+     * 禁用自定义世界边界
+     */
+    public void disableCustomWorldBorder() {
+        getConfig().set(CONFIG_CUSTOM_BORDER_ENABLED, false);
+        saveConfig();
+        getLogger().info("自定义世界边界已禁用。");
+    }
+
+    // ---------- 新增：监听器处理 ----------
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onPlayerMove(PlayerMoveEvent event) {
+        Player player = event.getPlayer();
+        Location to = event.getTo();
+        if (to == null) return;
+
+        World world = to.getWorld();
+        if (world == null) return;
+
+        double x = to.getX();
+        double z = to.getZ();
+        double absX = Math.abs(x);
+        double absZ = Math.abs(z);
+
+        // 1. 检查自定义边界（如果启用）
+        if (getConfig().getBoolean(CONFIG_CUSTOM_BORDER_ENABLED, false)) {
+            double diameter = getConfig().getDouble(CONFIG_CUSTOM_BORDER_DIAMETER, 59999968);
+            double radius = diameter / 2.0;
+
+            if (absX > radius || absZ > radius) {
+                Location corrected = to.clone();
+                if (absX > radius) {
+                    corrected.setX(x > 0 ? radius : -radius);
+                }
+                if (absZ > radius) {
+                    corrected.setZ(z > 0 ? radius : -radius);
+                }
+                player.teleport(corrected);
+                player.sendMessage("§c你已到达世界边界！");
+                return;
+            }
+        }
+
+        // 2. 对抗原版第二层级空气墙（超过 30M）
+        if (absX >= HARD_LIMIT || absZ >= HARD_LIMIT) {
+            // 强制加载目标位置的区块
+            int chunkX = to.getBlockX() >> 4;
+            int chunkZ = to.getBlockZ() >> 4;
+            Chunk chunk = world.getChunkAt(chunkX, chunkZ);
+            if (!chunk.isLoaded()) {
+                chunk.load(true);
+            }
+
+            // 如果使用 Paper，可以使用更高效的异步加载
+            if (isPaperServer()) {
+                world.getChunkAtAsync(chunkX, chunkZ, (c) -> c.setForceLoaded(true));
+            }
+
+            // 调度一个任务，再次将玩家传送到目标位置，以对抗拉回
+            final Location target = to.clone();
+            Scheduler.runTask(IllegalStack.this, () -> {
+                if (player.isOnline() && player.getWorld().equals(target.getWorld())) {
+                    player.teleport(target);
+                }
+            });
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onPlayerTeleport(PlayerTeleportEvent event) {
+        // 同样处理传送事件，确保传送后位置有效
+        Player player = event.getPlayer();
+        Location to = event.getTo();
+        if (to == null) return;
+
+        World world = to.getWorld();
+        if (world == null) return;
+
+        double x = to.getX();
+        double z = to.getZ();
+        double absX = Math.abs(x);
+        double absZ = Math.abs(z);
+
+        // 如果传送目标超过 30M，强制加载区块
+        if (absX >= HARD_LIMIT || absZ >= HARD_LIMIT) {
+            int chunkX = to.getBlockX() >> 4;
+            int chunkZ = to.getBlockZ() >> 4;
+            Chunk chunk = world.getChunkAt(chunkX, chunkZ);
+            if (!chunk.isLoaded()) {
+                chunk.load(true);
+            }
+            if (isPaperServer()) {
+                world.getChunkAtAsync(chunkX, chunkZ, (c) -> c.setForceLoaded(true));
+            }
+        }
+    }
+                            }
