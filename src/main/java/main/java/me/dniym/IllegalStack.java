@@ -129,6 +129,10 @@ public class IllegalStack extends JavaPlugin implements Listener {
     private final Set<Player> logViewers = ConcurrentHashMap.newKeySet();
     private Handler logHandler;
 
+    // ---------- 调试模式和静默崩溃配置 ----------
+    private static final String CONFIG_DEBUG_MODE = "debug-mode";
+    private static final String CONFIG_SILENT_CRASH_MODE = "silent-crash-mode";
+
     public static IllegalStack getPlugin() {
         return plugin;
     }
@@ -679,7 +683,28 @@ public class IllegalStack extends JavaPlugin implements Listener {
         // 初始化反作弊配置（如果不存在则设置默认值）
         getConfig().addDefault(CONFIG_ANTICHEAT_ANTI4D4V, false);
         getConfig().addDefault(CONFIG_ANTICHEAT_BANBBQ, false);
+        getConfig().addDefault(CONFIG_DEBUG_MODE, false);
+        getConfig().addDefault(CONFIG_SILENT_CRASH_MODE, false);
         getConfig().options().copyDefaults(true);
+        saveConfig();
+    }
+
+    // ---------- 调试模式 getter/setter ----------
+    public boolean isDebugMode() {
+        return getConfig().getBoolean(CONFIG_DEBUG_MODE, false);
+    }
+
+    public void setDebugMode(boolean enabled) {
+        getConfig().set(CONFIG_DEBUG_MODE, enabled);
+        saveConfig();
+    }
+
+    public boolean isSilentCrashMode() {
+        return getConfig().getBoolean(CONFIG_SILENT_CRASH_MODE, false);
+    }
+
+    public void setSilentCrashMode(boolean enabled) {
+        getConfig().set(CONFIG_SILENT_CRASH_MODE, enabled);
         saveConfig();
     }
 
@@ -1330,7 +1355,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
             }
 
             if (args.length < 1) {
-                sender.sendMessage("§c用法: /admin <player|server|chat|vanilla|anticheat> ...");
+                sender.sendMessage("§c用法: /admin <player|server|chat|vanilla|anticheat|debug|experimental> ...");
                 return true;
             }
 
@@ -1351,8 +1376,14 @@ public class IllegalStack extends JavaPlugin implements Listener {
                 case "anticheat":
                     handleAnticheat(sender, args);
                     break;
+                case "debug":
+                    handleDebug(sender, args);
+                    break;
+                case "experimental":
+                    handleExperimental(sender, args);
+                    break;
                 default:
-                    sender.sendMessage("§c未知选项，请使用 player、server、chat、vanilla 或 anticheat。");
+                    sender.sendMessage("§c未知选项，请使用 player、server、chat、vanilla、anticheat、debug 或 experimental。");
             }
             return true;
         }
@@ -1719,6 +1750,90 @@ public class IllegalStack extends JavaPlugin implements Listener {
             }
         }
 
+        // ================== debug 子命令（新增）==================
+        private void handleDebug(CommandSender sender, String[] args) {
+            if (args.length < 2) {
+                sender.sendMessage("§c用法: /admin debug <true|false>");
+                return;
+            }
+            boolean enable = Boolean.parseBoolean(args[1]);
+            IllegalStack.this.setDebugMode(enable);
+            sender.sendMessage("§a调试模式已" + (enable ? "开启" : "关闭"));
+        }
+
+        // ================== experimental 子命令（重命名并增强）==================
+        private void handleExperimental(CommandSender sender, String[] args) {
+            // 检查调试模式
+            if (!IllegalStack.this.isDebugMode()) {
+                sender.sendMessage("§c你需要开启调试模式！开启调试模式意味着服务器将会变的不稳定！");
+                return;
+            }
+
+            if (args.length < 2) {
+                sender.sendMessage("§c用法: /admin experimental <crash|crash-config> ...");
+                return;
+            }
+            String sub = args[1].toLowerCase();
+            if (sub.equals("crash")) {
+                handleCrash(sender, args);
+            } else if (sub.equals("crash-config")) {
+                handleCrashConfig(sender, args);
+            } else {
+                sender.sendMessage("§c未知的 experimental 子命令，可用: crash, crash-config");
+            }
+        }
+
+        private void handleCrash(CommandSender sender, String[] args) {
+            if (args.length < 3) {
+                sender.sendMessage("§c用法: /admin experimental crash <异常类型>");
+                sender.sendMessage("§c可用异常类型: IncompatibleClassChangeError, NullPointerException, StackOverflowError, OutOfMemoryError, ArithmeticException, IllegalArgumentException, IndexOutOfBoundsException");
+                return;
+            }
+            String exceptionType = args[2];
+
+            // 静默崩溃模式处理
+            if (IllegalStack.this.isSilentCrashMode()) {
+                sender.sendMessage("§c静默崩溃模式已开启，正在关闭服务器...");
+                Bukkit.shutdown();
+                return;
+            }
+
+            // 正常抛出异常
+            switch (exceptionType.toLowerCase()) {
+                case "incompatibleclasschangeerror":
+                    throw new IncompatibleClassChangeError("§c手动触发的测试崩溃 (IncompatibleClassChangeError)");
+                case "nullpointerexception":
+                    throw new NullPointerException("§c手动触发的测试崩溃 (NullPointerException)");
+                case "stackoverflowerror":
+                    throw new StackOverflowError("§c手动触发的测试崩溃 (StackOverflowError)");
+                case "outofmemoryerror":
+                    throw new OutOfMemoryError("§c手动触发的测试崩溃 (OutOfMemoryError)");
+                case "arithmeticexception":
+                    throw new ArithmeticException("§c手动触发的测试崩溃 (ArithmeticException)");
+                case "illegalargumentexception":
+                    throw new IllegalArgumentException("§c手动触发的测试崩溃 (IllegalArgumentException)");
+                case "indexoutofboundsexception":
+                    throw new IndexOutOfBoundsException("§c手动触发的测试崩溃 (IndexOutOfBoundsException)");
+                default:
+                    sender.sendMessage("§c未知的异常类型，可用: IncompatibleClassChangeError, NullPointerException, StackOverflowError, OutOfMemoryError, ArithmeticException, IllegalArgumentException, IndexOutOfBoundsException");
+            }
+        }
+
+        private void handleCrashConfig(CommandSender sender, String[] args) {
+            if (args.length < 4) {
+                sender.sendMessage("§c用法: /admin experimental crash-config silent-crash-mode <true|false>");
+                return;
+            }
+            String option = args[2].toLowerCase();
+            if (!option.equals("silent-crash-mode")) {
+                sender.sendMessage("§c未知的配置项，可用: silent-crash-mode");
+                return;
+            }
+            boolean enable = Boolean.parseBoolean(args[3]);
+            IllegalStack.this.setSilentCrashMode(enable);
+            sender.sendMessage("§a静默崩溃模式已" + (enable ? "开启" : "关闭"));
+        }
+
         // ================== 辅助方法 ==================
         private GameMode parseGameMode(String input) {
             switch (input.toLowerCase()) {
@@ -1750,6 +1865,8 @@ public class IllegalStack extends JavaPlugin implements Listener {
                 if ("chat".startsWith(input)) completions.add("chat");
                 if ("vanilla".startsWith(input)) completions.add("vanilla");
                 if ("anticheat".startsWith(input)) completions.add("anticheat");
+                if ("debug".startsWith(input)) completions.add("debug");
+                if ("experimental".startsWith(input)) completions.add("experimental");
             } else if (args.length == 2) {
                 String first = args[0].toLowerCase();
                 String input = args[1].toLowerCase();
@@ -1779,6 +1896,12 @@ public class IllegalStack extends JavaPlugin implements Listener {
                 } else if (first.equals("anticheat")) {
                     if ("anti4d4v".startsWith(input)) completions.add("anti4d4v");
                     if ("antibbq".startsWith(input)) completions.add("antibbq");
+                } else if (first.equals("debug")) {
+                    if ("true".startsWith(input)) completions.add("true");
+                    if ("false".startsWith(input)) completions.add("false");
+                } else if (first.equals("experimental")) {
+                    if ("crash".startsWith(input)) completions.add("crash");
+                    if ("crash-config".startsWith(input)) completions.add("crash-config");
                 }
             } else if (args.length == 3) {
                 String first = args[0].toLowerCase();
@@ -1826,6 +1949,26 @@ public class IllegalStack extends JavaPlugin implements Listener {
                         }
                     }
                 } else if (first.equals("anticheat") && (second.equals("anti4d4v") || second.equals("antibbq"))) {
+                    if ("true".startsWith(input)) completions.add("true");
+                    if ("false".startsWith(input)) completions.add("false");
+                } else if (first.equals("debug")) {
+                    // 不需要补全，已在 args.length==2 处理
+                } else if (first.equals("experimental")) {
+                    if (second.equals("crash")) {
+                        // 补全异常类型
+                        for (String type : new String[]{"IncompatibleClassChangeError", "NullPointerException", "StackOverflowError", "OutOfMemoryError", "ArithmeticException", "IllegalArgumentException", "IndexOutOfBoundsException"}) {
+                            if (type.toLowerCase().startsWith(input)) completions.add(type);
+                        }
+                    } else if (second.equals("crash-config")) {
+                        if ("silent-crash-mode".startsWith(input)) completions.add("silent-crash-mode");
+                    }
+                }
+            } else if (args.length == 4) {
+                String first = args[0].toLowerCase();
+                String second = args[1].toLowerCase();
+                String third = args[2].toLowerCase();
+                String input = args[3].toLowerCase();
+                if (first.equals("experimental") && second.equals("crash-config") && third.equals("silent-crash-mode")) {
                     if ("true".startsWith(input)) completions.add("true");
                     if ("false".startsWith(input)) completions.add("false");
                 }
