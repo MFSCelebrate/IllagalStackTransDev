@@ -112,8 +112,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
 
     // ---------- 新增：自定义边界相关 ----------
     private static final double HARD_LIMIT = 30_000_000D; // 原版第二层级硬限制
-    private static final String CONFIG_CUSTOM_BORDER_ENABLED = "custom-border-enabled";
-    private static final String CONFIG_CUSTOM_BORDER_DIAMETER = "custom-border-diameter";
+    private static final String CONFIG_WORLDS = "worlds"; // 配置节
 
     public static IllegalStack getPlugin() {
         return plugin;
@@ -499,9 +498,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
 
         // ---------- 注册自定义边界监听器 ----------
         getServer().getPluginManager().registerEvents(this, this);
-        if (getConfig().getBoolean(CONFIG_CUSTOM_BORDER_ENABLED, false)) {
-            getLogger().info("自定义世界边界已启用，直径: " + getConfig().getDouble(CONFIG_CUSTOM_BORDER_DIAMETER, 59999968));
-        }
         // -----------------------------------------
 
         ProCosmetics = this.getServer().getPluginManager().getPlugin("ProCosmetics");
@@ -1610,7 +1606,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
             }
         }
 
-        // ================== vanilla 子命令（新增）==================
+        // ================== vanilla 子命令（修改后）==================
         private void handleVanilla(CommandSender sender, String[] args) {
             if (args.length < 2) {
                 sender.sendMessage("§c用法: /admin vanilla <子命令> ...");
@@ -1623,20 +1619,36 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     return;
                 }
                 boolean enable = Boolean.parseBoolean(args[2]);
-                // 调用主类方法部署或移除数据包
                 IllegalStack.getPlugin().setShepherdHouseFix(enable);
                 sender.sendMessage("§a已设置雪地牧羊人小屋修复为: " + enable + "。§c请执行 /reload 或重启服务器生效！");
             } else if (sub.equals("worldborder")) {
-                if (args.length < 3) {
-                    sender.sendMessage("§c用法: /admin vanilla worldborder <直径>");
+                if (args.length < 4) {
+                    sender.sendMessage("§c用法: /admin vanilla worldborder <世界名|all> <直径>");
                     return;
                 }
+                String targetWorld = args[2];
+                double diameter;
                 try {
-                    double diameter = Double.parseDouble(args[2]);
-                    setCustomWorldBorder(diameter);
-                    sender.sendMessage("§a已设置自定义世界边界直径: " + diameter);
+                    diameter = Double.parseDouble(args[3]);
                 } catch (NumberFormatException e) {
                     sender.sendMessage("§c直径必须是数字！");
+                    return;
+                }
+
+                if (targetWorld.equalsIgnoreCase("all")) {
+                    // 为所有世界设置边界
+                    for (World world : Bukkit.getWorlds()) {
+                        setCustomWorldBorder(world.getName(), diameter);
+                    }
+                    sender.sendMessage("§a已为所有世界设置自定义世界边界直径: " + diameter);
+                } else {
+                    World world = Bukkit.getWorld(targetWorld);
+                    if (world == null) {
+                        sender.sendMessage("§c世界 " + targetWorld + " 不存在！");
+                        return;
+                    }
+                    setCustomWorldBorder(world.getName(), diameter);
+                    sender.sendMessage("§a已为世界 " + world.getName() + " 设置自定义世界边界直径: " + diameter);
                 }
             } else {
                 sender.sendMessage("§c未知的 vanilla 子命令。可用: building_entrance:snowy_shepherds_house_1, worldborder");
@@ -1755,7 +1767,20 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     if ("true".startsWith(input)) completions.add("true");
                     if ("false".startsWith(input)) completions.add("false");
                 } else if (first.equals("vanilla") && second.equals("worldborder")) {
-                    // 可以提示输入数字，但这里不添加补全
+                    // 补全世界名和 all
+                    if ("all".startsWith(input)) completions.add("all");
+                    for (World world : Bukkit.getWorlds()) {
+                        if (world.getName().toLowerCase().startsWith(input)) {
+                            completions.add(world.getName());
+                        }
+                    }
+                }
+            } else if (args.length == 4) {
+                String first = args[0].toLowerCase();
+                String second = args[1].toLowerCase();
+                String third = args[2].toLowerCase();
+                if (first.equals("vanilla") && second.equals("worldborder")) {
+                    // 第三参数是世界名或 all，第四参数是直径，可以提示数字（不补全）
                 }
             }
             return completions;
@@ -1845,26 +1870,47 @@ public class IllegalStack extends JavaPlugin implements Listener {
         dir.delete();
     }
 
-    // ---------- 新增：自定义世界边界相关方法 ----------
+    // ---------- 新增：自定义世界边界相关方法（按世界）----------
 
     /**
-     * 设置自定义世界边界（覆盖原版 30M 限制）
+     * 设置指定世界的自定义世界边界（覆盖原版 30M 限制）
+     * @param worldName 世界名
      * @param diameter 直径（方块）
      */
-    public void setCustomWorldBorder(double diameter) {
-        getConfig().set(CONFIG_CUSTOM_BORDER_ENABLED, true);
-        getConfig().set(CONFIG_CUSTOM_BORDER_DIAMETER, diameter);
+    public void setCustomWorldBorder(String worldName, double diameter) {
+        String path = CONFIG_WORLDS + "." + worldName + ".diameter";
+        getConfig().set(path, diameter);
         saveConfig();
-        getLogger().info("自定义世界边界已启用，直径: " + diameter);
+        getLogger().info("世界 " + worldName + " 自定义边界已启用，直径: " + diameter);
     }
 
     /**
-     * 禁用自定义世界边界
+     * 禁用指定世界的自定义世界边界
+     * @param worldName 世界名
      */
-    public void disableCustomWorldBorder() {
-        getConfig().set(CONFIG_CUSTOM_BORDER_ENABLED, false);
+    public void disableCustomWorldBorder(String worldName) {
+        String path = CONFIG_WORLDS + "." + worldName;
+        getConfig().set(path, null); // 移除该世界配置
         saveConfig();
-        getLogger().info("自定义世界边界已禁用。");
+        getLogger().info("世界 " + worldName + " 自定义边界已禁用。");
+    }
+
+    /**
+     * 检查世界是否启用了自定义边界
+     * @param world 世界
+     * @return true 如果启用了自定义边界
+     */
+    private boolean isWorldBorderEnabled(World world) {
+        return getConfig().contains(CONFIG_WORLDS + "." + world.getName() + ".diameter");
+    }
+
+    /**
+     * 获取世界的自定义边界直径
+     * @param world 世界
+     * @return 直径，如果未启用则返回 -1
+     */
+    private double getWorldBorderDiameter(World world) {
+        return getConfig().getDouble(CONFIG_WORLDS + "." + world.getName() + ".diameter", -1);
     }
 
     // ---------- 新增：监听器处理 ----------
@@ -1883,9 +1929,9 @@ public class IllegalStack extends JavaPlugin implements Listener {
         double absX = Math.abs(x);
         double absZ = Math.abs(z);
 
-        // 1. 检查自定义边界（如果启用）
-        if (getConfig().getBoolean(CONFIG_CUSTOM_BORDER_ENABLED, false)) {
-            double diameter = getConfig().getDouble(CONFIG_CUSTOM_BORDER_DIAMETER, 59999968);
+        // 1. 检查自定义边界（如果该世界启用了自定义边界）
+        if (isWorldBorderEnabled(world)) {
+            double diameter = getWorldBorderDiameter(world);
             double radius = diameter / 2.0;
 
             if (absX > radius || absZ > radius) {
@@ -1955,4 +2001,4 @@ public class IllegalStack extends JavaPlugin implements Listener {
             }
         }
     }
-                            }
+                                 }
