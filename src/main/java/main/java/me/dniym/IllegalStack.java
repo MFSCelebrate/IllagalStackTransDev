@@ -1956,31 +1956,38 @@ public class IllegalStack extends JavaPlugin implements Listener {
 
     // ---------- 日志处理 ----------
     private void setupLogHandler() {
-        if (logHandler != null) return;
-        logHandler = new Handler() {
-            @Override
-            public void publish(LogRecord record) {
-                String message = record.getMessage();
-                if (record.getParameters() != null) {
-                    message = String.format(message, record.getParameters());
-                }
-                String colored = ChatColor.translateAlternateColorCodes('&', message);
-                for (Player viewer : logViewers) {
-                    if (viewer.isOnline()) {
-                        viewer.sendMessage(colored);
-                    } else {
-                        logViewers.remove(viewer);
-                    }
-                }
-                if (logViewers.isEmpty()) {
-                    removeLogHandler();
-                }
+    if (logHandler != null) return;
+    logHandler = new Handler() {
+        @Override
+        public void publish(LogRecord record) {
+            // 获取原始日志消息（不尝试格式化参数，因为大多数日志已经是完整字符串）
+            String message = record.getMessage();
+
+            // 安全地移除离线的查看者，避免并发修改异常
+            logViewers.removeIf(viewer -> !viewer.isOnline());
+
+            // 将消息发送给所有在线的查看者
+            for (Player viewer : logViewers) {
+                viewer.sendMessage(message);
             }
-            @Override public void flush() {}
-            @Override public void close() {}
-        };
-        Bukkit.getLogger().addHandler(logHandler);
-    }
+
+            // 如果没有查看者，自动移除 Handler
+            if (logViewers.isEmpty()) {
+                removeLogHandler();
+            }
+        }
+
+        @Override
+        public void flush() {}
+
+        @Override
+        public void close() throws SecurityException {}
+    };
+
+    // 设置 Handler 级别为 ALL，确保捕获所有日志
+    logHandler.setLevel(Level.ALL);
+    Bukkit.getLogger().addHandler(logHandler);
+}
 
     private void removeLogHandler() {
         if (logHandler != null) {
