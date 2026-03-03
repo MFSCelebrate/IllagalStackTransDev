@@ -15,7 +15,7 @@ commands:
     usage: "Usage: /istack"
   admin:
     description: IllagalStackTrans Extra Commands
-    usage: /admin <player|server|chat|vanilla> ...
+    usage: /admin ...
     
 permissions:
   illegalstack.admin:
@@ -39,4 +39,5 @@ permissions:
   illegalstack.serverchat:
     description: 此权限已弃用，原功能已合并至 /admin chat。
     default: op
+
 
