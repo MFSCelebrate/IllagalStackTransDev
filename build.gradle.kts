@@ -1,7 +1,6 @@
 plugins {
     java
     `java-library`
-
     idea
     eclipse
 }
@@ -11,10 +10,6 @@ repositories {
     maven {
         name = "OSS Sonatype"
         url = uri("https://oss.sonatype.org/content/repositories/snapshots/")
-    }
-    maven {
-        name = "PaperMC"
-        url = uri("https://repo.papermc.io/repository/maven-public/")
     }
     maven {
         name = "PaperMC"
@@ -40,6 +35,8 @@ repositories {
 
 dependencies {
     compileOnly("dev.folia:folia-api:1.20.4-R0.1-SNAPSHOT")
+    // 添加 Paper server 依赖以访问 NMS 类（如 NbtIo）
+    compileOnly("io.papermc.paper:paper-server:1.21-R0.1-SNAPSHOT")
     compileOnly("com.comphenix.protocol:ProtocolLib:5.3.0")
     compileOnly("com.elmakers.mine.bukkit:MagicAPI:10.2")
     compileOnly("de.tr7zw:item-nbt-api-plugin:2.8.0")
@@ -55,18 +52,18 @@ dependencies {
 }
 
 the<JavaPluginExtension>().toolchain {
-    languageVersion.set(JavaLanguageVersion.of(17))
+    languageVersion.set(JavaLanguageVersion.of(21))
 }
 
 configurations.all {
-    attributes.attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 17)
+    attributes.attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 21)
 }
 
 tasks.compileJava.configure {
-    options.release.set(8)
+    options.release.set(21)
 }
 
-version = "2.9.15a ExtraVer_CN"
+version = "3.0.00Preview ExtraVer Java21Test"
 
 tasks.named<Copy>("processResources") {
     filesMatching("plugin.yml") {
