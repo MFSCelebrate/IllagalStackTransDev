@@ -2080,19 +2080,22 @@ public class IllegalStack extends JavaPlugin implements Listener {
         private final World world;
 
         public LevelDatEditor(World world) throws Exception {
-            this.world = world;
-            File worldFolder = world.getWorldFolder();
-            this.levelFile = new File(worldFolder, "level.dat");
-            if (!levelFile.exists()) throw new IOException("level.dat 不存在！");
-            Class<?> nbtIoClass = Class.forName("net.minecraft.nbt.NbtIo");
-            java.lang.reflect.Method readMethod = nbtIoClass.getMethod("readCompressed", java.io.InputStream.class);
-            try (FileInputStream fis = new FileInputStream(levelFile);
-                 GZIPInputStream gzis = new GZIPInputStream(fis)) {
-                Object root = readMethod.invoke(null, gzis);
-                java.lang.reflect.Method getMethod = root.getClass().getMethod("get", String.class);
-                this.compound = getMethod.invoke(root, "Data");
-                if (this.compound == null) throw new IOException("level.dat 中缺少 Data 标签");
-            }
+    this.world = world;
+    File worldFolder = world.getWorldFolder();
+    this.levelFile = new File(worldFolder, "level.dat");
+    if (!levelFile.exists()) throw new IOException("level.dat 不存在！");
+    
+    // 反射获取 NbtIo 类
+    Class<?> nbtIoClass = Class.forName("net.minecraft.nbt.NbtIo");
+    java.lang.reflect.Method readMethod = nbtIoClass.getMethod("readCompressed", java.io.InputStream.class);
+    
+    try (FileInputStream fis = new FileInputStream(levelFile);
+         GZIPInputStream gzis = new GZIPInputStream(fis)) {
+        Object root = readMethod.invoke(null, gzis);
+        java.lang.reflect.Method getMethod = root.getClass().getMethod("get", String.class);
+        this.compound = getMethod.invoke(root, "Data");
+        if (this.compound == null) throw new IOException("level.dat 中缺少 Data 标签");
+    }
         }
 
         private java.lang.reflect.Method getPutMethod(String type) throws NoSuchMethodException {
