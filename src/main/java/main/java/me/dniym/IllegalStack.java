@@ -1816,10 +1816,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     case "difficultylocked":
                         if (args.length < 5) throw new IllegalArgumentException("需要 true/false");
                         boolean bVal = Boolean.parseBoolean(args[4]);
-                        editor.setBoolean(option, bVal);
-                        if (option.equals("raining")) world.setStorm(bVal);
-                        else if (option.equals("thundering")) world.setThundering(bVal);
-                        else if (option.equals("difficultylocked")) world.setDifficultyLocked(bVal);
+                        editor.setBoolean("DifficultyLocked", bVal);
                         break;
                     case "raintime":
                     case "thundertime":
