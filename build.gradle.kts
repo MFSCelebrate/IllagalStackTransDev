@@ -36,7 +36,7 @@ repositories {
 dependencies {
     compileOnly("dev.folia:folia-api:1.20.4-R0.1-SNAPSHOT")
     // 添加 Paper Remapped Mojang 依赖以访问 NMS 类（如 NbtIo）
-    compileOnly("io.papermc.paper:paper-api:1.21-R0.1-SNAPSHOT:remapped-mojang")
+    compileOnly("io.papermc.paper:paper-api:1.21.1-R0.1-SNAPSHOT:remapped-mojang")
     compileOnly("com.comphenix.protocol:ProtocolLib:5.3.0")
     compileOnly("com.elmakers.mine.bukkit:MagicAPI:10.2")
     compileOnly("de.tr7zw:item-nbt-api-plugin:2.8.0")
