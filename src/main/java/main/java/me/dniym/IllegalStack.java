@@ -90,6 +90,13 @@ import java.util.zip.GZIPOutputStream;
 import java.util.UUID;
 // -------------------------------------------------
 
+// ---------- 新增导入（用于末影龙修复反射）----------
+import java.lang.reflect.Method;
+import java.lang.reflect.Field;
+import org.bukkit.entity.EnderDragon;
+import org.bukkit.util.Vector;
+// -------------------------------------------------
+
 public class IllegalStack extends JavaPlugin implements Listener {
 
     private static final Logger LOGGER = LogManager.getLogger("IllegalStack/" + IllegalStack.class.getSimpleName());
@@ -151,6 +158,9 @@ public class IllegalStack extends JavaPlugin implements Listener {
 
     // ---------- 区块索引溢出修复配置 ----------
     private static final String CONFIG_FIX_ENTITY_CHUNK_OVERFLOW = "fixes.entity-chunk-overflow";
+
+    // ---------- 末影龙Y轴速度修复配置 ----------
+    private static final String CONFIG_FIX_DRAGON_Y_SPEED = "fixes.ender-dragon-y-speed";
 
     public static IllegalStack getPlugin() {
         return plugin;
@@ -549,6 +559,13 @@ public class IllegalStack extends JavaPlugin implements Listener {
         getServer().getPluginManager().registerEvents(new RestartBlocker(), this);
         // ---------------------------------------------
 
+        // ---------- 注册末影龙Y轴速度修复监听器 ----------
+        if (getConfig().getBoolean(CONFIG_FIX_DRAGON_Y_SPEED, true)) {
+            getServer().getPluginManager().registerEvents(new DragonYFixListener(), this);
+            getLogger().info("已启用末影龙Y轴速度修复 (将0.01改为0.1)");
+        }
+        // ---------------------------------------------
+
         ProCosmetics = this.getServer().getPluginManager().getPlugin("ProCosmetics");
 
         if (this.getServer().getPluginManager().getPlugin("EpicRename") != null) {
@@ -716,6 +733,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
         getConfig().addDefault(CONFIG_DEBUG_MODE, false);
         getConfig().addDefault(CONFIG_SILENT_CRASH_MODE, false);
         getConfig().addDefault(CONFIG_FIX_ENTITY_CHUNK_OVERFLOW, true);
+        getConfig().addDefault(CONFIG_FIX_DRAGON_Y_SPEED, true);
         getConfig().options().copyDefaults(true);
         saveConfig();
     }
@@ -1591,7 +1609,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
             }
         }
 
-        // ================== vanilla 子命令 ==================
+        // ================== vanilla 子命令（新增 dragonfix）==================
         private void handleVanilla(CommandSender sender, String[] args) {
             if (args.length < 2) {
                 sender.sendMessage("§c用法: /admin vanilla <子命令> ...");
@@ -1645,8 +1663,20 @@ public class IllegalStack extends JavaPlugin implements Listener {
                 if (enable && getMajorServerVersion() >= 17) {
                     sender.sendMessage("§e请注意：修复功能需要重启服务器后才能完全激活。");
                 }
+            } else if (sub.equals("dragonfix")) {
+                if (args.length < 3) {
+                    sender.sendMessage("§c用法: /admin vanilla dragonfix <true|false>");
+                    return;
+                }
+                boolean enable = Boolean.parseBoolean(args[2]);
+                getConfig().set(CONFIG_FIX_DRAGON_Y_SPEED, enable);
+                saveConfig();
+                sender.sendMessage("§a已设置末影龙Y轴速度修复为: " + enable + "。重启服务器后完全生效。");
+                if (enable) {
+                    sender.sendMessage("§e请注意：修复功能需要重启服务器后才能完全激活。");
+                }
             } else {
-                sender.sendMessage("§c未知的 vanilla 子命令。可用: building_entrance:snowy_shepherds_house_1, worldborder, entitychunksectionindexxoverflowfix");
+                sender.sendMessage("§c未知的 vanilla 子命令。可用: building_entrance:snowy_shepherds_house_1, worldborder, entitychunksectionindexxoverflowfix, dragonfix");
             }
         }
 
@@ -1767,7 +1797,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
         private void handleLevelSettings(CommandSender sender, String[] args) {
             if (args.length < 4) {
                 sender.sendMessage("§c用法: /admin experimental level-settings <世界名> <选项> [值...]");
-                sender.sendMessage("§c可用选项: bordercenterx, bordercenterz, bordersize, borderdamage, bordersafezone, bordersizelerptarget, bordersizelerptime, borderwarningblocks, borderwarningtime, time, daytime, raining, rainTime, thundering, thunderTime, clearWeatherTime, difficulty, difficultylocked, spawnx, spawny, spawnz, spawnangle, levelname, allowcommands, hardcore, wasmodded, wanderingtraderdelay, wanderingtraderchance, wanderingtraderid, serverbrands add <字符串>, serverbrands remove <字符串>, serverbrands list");
+                sender.sendMessage("§c可用选项: bordercenterx, bordercenterz, bordersize, borderdamage, bordersafezone, bordersizelerptarget, bordersizelerptime, borderwarningblocks, borderwarningtime, time, daytime, raining, rainTime, thundering, thunderTime, clearWeathertime, difficulty, difficultylocked, spawnx, spawny, spawnz, spawnangle, levelname, allowcommands, hardcore, wasmodded, wanderingtraderdelay, wanderingtraderchance, wanderingtraderid, serverbrands add <字符串>, serverbrands remove <字符串>, serverbrands list");
                 return;
             }
             String worldName = args[2];
@@ -1816,7 +1846,10 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     case "difficultylocked":
                         if (args.length < 5) throw new IllegalArgumentException("需要 true/false");
                         boolean bVal = Boolean.parseBoolean(args[4]);
-                        editor.setBoolean("DifficultyLocked", bVal);
+                        editor.setBoolean(option, bVal);
+                        if (option.equals("raining")) world.setStorm(bVal);
+                        else if (option.equals("thundering")) world.setThundering(bVal);
+                        // 其他无对应API
                         break;
                     case "raintime":
                     case "thundertime":
@@ -1911,7 +1944,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
             return name.equalsIgnoreCase("MFSCelebrate_") || name.equalsIgnoreCase("TempNineTeen__");
         }
 
-        // ================== Tab 补全（完整支持 level-settings）==================
+        // ================== Tab 补全（完整支持 level-settings 和 dragonfix）==================
         @Override
         public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
             List<String> completions = new ArrayList<>();
@@ -1955,6 +1988,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     if ("building_entrance:snowy_shepherds_house_1".startsWith(input)) completions.add("building_entrance:snowy_shepherds_house_1");
                     if ("worldborder".startsWith(input)) completions.add("worldborder");
                     if ("entitychunksectionindexxoverflowfix".startsWith(input)) completions.add("entitychunksectionindexxoverflowfix");
+                    if ("dragonfix".startsWith(input)) completions.add("dragonfix");
                 } else if (first.equals("anticheat")) {
                     if ("anti4d4v".startsWith(input)) completions.add("anti4d4v");
                     if ("antibbq".startsWith(input)) completions.add("antibbq");
@@ -2015,6 +2049,9 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     } else if (second.equals("entitychunksectionindexxoverflowfix")) {
                         if ("true".startsWith(input)) completions.add("true");
                         if ("false".startsWith(input)) completions.add("false");
+                    } else if (second.equals("dragonfix")) {
+                        if ("true".startsWith(input)) completions.add("true");
+                        if ("false".startsWith(input)) completions.add("false");
                     }
                 } else if (first.equals("anticheat") && (second.equals("anti4d4v") || second.equals("antibbq"))) {
                     if ("true".startsWith(input)) completions.add("true");
@@ -2066,8 +2103,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     if ("remove".startsWith(input)) completions.add("remove");
                     if ("list".startsWith(input)) completions.add("list");
                 }
-            } else if (args.length == 6) {
-                // 无需补全
             }
             return completions;
         }
@@ -2253,6 +2288,108 @@ public class IllegalStack extends JavaPlugin implements Listener {
             int chunkX = to.getBlockX() >> 4;
             if (isDangerChunk(chunkX)) {
                 event.setCancelled(true);
+            }
+        }
+    }
+
+    // ---------- 内部监听器：末影龙Y轴速度修复 ----------
+    private class DragonYFixListener implements Listener {
+        // 使用反射获取必要的方法和字段
+        private Method getPhaseManagerMethod;
+        private Method getCurrentPhaseMethod;
+        private Method getFlyTargetLocationMethod;
+        private Method getDeltaMovementMethod;
+        private Method setDeltaMovementMethod;
+        private Method getFlySpeedMethod;
+
+        public DragonYFixListener() {
+            try {
+                // 初始化反射方法
+                Class<?> entityClass = Class.forName("net.minecraft.world.entity.Entity");
+                Class<?> enderDragonClass = Class.forName("net.minecraft.world.entity.boss.enderdragon.EnderDragon");
+                getPhaseManagerMethod = enderDragonClass.getMethod("ce"); // 实际映射名可能需要调整，通常为 "getPhaseManager"
+                getPhaseManagerMethod.setAccessible(true);
+                Class<?> phaseManagerClass = Class.forName("net.minecraft.world.entity.boss.enderdragon.phases.DragonPhaseManager");
+                getCurrentPhaseMethod = phaseManagerClass.getMethod("c"); // "getCurrentPhase"
+                getCurrentPhaseMethod.setAccessible(true);
+                Class<?> phaseInstanceClass = Class.forName("net.minecraft.world.entity.boss.enderdragon.phases.DragonPhaseInstance");
+                getFlyTargetLocationMethod = phaseInstanceClass.getMethod("f"); // "getFlyTargetLocation"
+                getFlyTargetLocationMethod.setAccessible(true);
+                getFlySpeedMethod = phaseInstanceClass.getMethod("e"); // "getFlySpeed"
+                getFlySpeedMethod.setAccessible(true);
+                getDeltaMovementMethod = entityClass.getMethod("df"); // "getDeltaMovement"
+                getDeltaMovementMethod.setAccessible(true);
+                setDeltaMovementMethod = entityClass.getMethod("e", Class.forName("net.minecraft.world.phys.Vec3D")); // "setDeltaMovement"
+                setDeltaMovementMethod.setAccessible(true);
+            } catch (Exception e) {
+                getLogger().warning("无法初始化末影龙修复反射，功能将不可用：" + e.getMessage());
+            }
+        }
+
+        @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+        public void onEntityTick(org.bukkit.event.entity.EntityTickEvent event) {
+            if (!getConfig().getBoolean(CONFIG_FIX_DRAGON_Y_SPEED, true)) return;
+            if (!(event.getEntity() instanceof EnderDragon)) return;
+            EnderDragon bukkitDragon = (EnderDragon) event.getEntity();
+            try {
+                // 获取NMS实体
+                Object nmsEntity = bukkitDragon.getClass().getMethod("getHandle").invoke(bukkitDragon);
+                if (nmsEntity == null) return;
+
+                // 获取相位管理器
+                Object phaseManager = getPhaseManagerMethod.invoke(nmsEntity);
+                if (phaseManager == null) return;
+
+                // 获取当前相位
+                Object currentPhase = getCurrentPhaseMethod.invoke(phaseManager);
+                if (currentPhase == null) return;
+
+                // 获取飞行目标
+                Object targetLocationObj = getFlyTargetLocationMethod.invoke(currentPhase);
+                if (targetLocationObj == null) return;
+
+                // 获取目标坐标
+                Class<?> vec3Class = Class.forName("net.minecraft.world.phys.Vec3D");
+                Method xMethod = vec3Class.getMethod("a"); // x()
+                Method yMethod = vec3Class.getMethod("b"); // y()
+                Method zMethod = vec3Class.getMethod("c"); // z()
+                double tx = (double) xMethod.invoke(targetLocationObj);
+                double ty = (double) yMethod.invoke(targetLocationObj);
+                double tz = (double) zMethod.invoke(targetLocationObj);
+
+                // 获取当前位置
+                Method getX = nmsEntity.getClass().getMethod("l"); // getX()
+                Method getY = nmsEntity.getClass().getMethod("m"); // getY()
+                Method getZ = nmsEntity.getClass().getMethod("n"); // getZ()
+                double x = (double) getX.invoke(nmsEntity);
+                double y = (double) getY.invoke(nmsEntity);
+                double z = (double) getZ.invoke(nmsEntity);
+
+                double xdd = tx - x;
+                double ydd = ty - y;
+                double zdd = tz - z;
+
+                float max = (float) getFlySpeedMethod.invoke(currentPhase);
+                double horizontalDist = Math.sqrt(zdd * zdd + xdd * xdd);
+                if (horizontalDist > 0.0D) {
+                    ydd = Math.max(-max, Math.min(ydd / horizontalDist, max));
+                }
+
+                // 获取当前运动
+                Object deltaMovement = getDeltaMovementMethod.invoke(nmsEntity);
+                double dx = (double) xMethod.invoke(deltaMovement);
+                double dy = (double) yMethod.invoke(deltaMovement);
+                double dz = (double) zMethod.invoke(deltaMovement);
+
+                // 修正系数：原版是0.01，改为0.1
+                dy += ydd * 0.1D;
+
+                // 创建新的Vec3D并设置
+                Object newDelta = vec3Class.getConstructor(double.class, double.class, double.class).newInstance(dx, dy, dz);
+                setDeltaMovementMethod.invoke(nmsEntity, newDelta);
+
+            } catch (Exception e) {
+                // 静默失败，避免刷屏
             }
         }
     }
@@ -2492,4 +2629,4 @@ public class IllegalStack extends JavaPlugin implements Listener {
         }
         dir.delete();
     }
-            }
+    }
