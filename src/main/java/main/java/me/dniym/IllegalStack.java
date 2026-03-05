@@ -90,16 +90,17 @@ import java.util.zip.GZIPOutputStream;
 import java.util.UUID;
 // -------------------------------------------------
 
-// ---------- 新增导入（用于末影龙修复）----------
-import org.bukkit.craftbukkit.v1_21_R1.entity.CraftEnderDragon;
+// ---------- 新增导入（用于末影龙修复，使用通用 CraftEntity）----------
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.StringTag;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.entity.boss.enderdragon.phases.DragonPhaseManager;
 import net.minecraft.world.entity.boss.enderdragon.phases.DragonPhaseInstance;
 import net.minecraft.world.phys.Vec3;
+import org.bukkit.craftbukkit.entity.CraftEntity;
 // -------------------------------------------------
 
 public class IllegalStack extends JavaPlugin implements Listener {
@@ -2113,10 +2114,10 @@ public class IllegalStack extends JavaPlugin implements Listener {
         }
     }
 
-    // ---------- 内部类：level.dat 编辑器（使用直接 NMS 调用）----------
+    // ---------- 内部类：level.dat 编辑器（使用直接 NMS 调用，适配 1.21）----------
     private class LevelDatEditor {
         private final File levelFile;
-        private CompoundTag compound; // 直接使用 NMS CompoundTag
+        private CompoundTag compound; // net.minecraft.nbt.CompoundTag
         private final World world;
 
         public LevelDatEditor(World world) throws IOException {
@@ -2126,11 +2127,10 @@ public class IllegalStack extends JavaPlugin implements Listener {
             if (!levelFile.exists()) throw new IOException("level.dat 不存在！");
             try (FileInputStream fis = new FileInputStream(levelFile);
                  GZIPInputStream gzis = new GZIPInputStream(fis)) {
-                CompoundTag root = NbtIo.readCompressed(gzis);
+                // 1.21 需要 NbtAccounter 参数
+                CompoundTag root = NbtIo.readCompressed(gzis, NbtAccounter.UNLIMITED);
                 this.compound = root.getCompound("Data");
                 if (this.compound == null) throw new IOException("level.dat 中缺少 Data 标签");
-            } catch (IOException e) {
-                throw e;
             }
         }
 
@@ -2261,17 +2261,18 @@ public class IllegalStack extends JavaPlugin implements Listener {
         }
     }
 
-    // ---------- 内部监听器：末影龙Y轴速度修复（使用直接 NMS 调用）----------
+    // ---------- 内部监听器：末影龙Y轴速度修复（使用通用 CraftEntity 获取 NMS 实体）----------
     private class DragonYFixListener implements Listener {
 
         @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
         public void onEntityTick(org.bukkit.event.entity.EntityTickEvent event) {
             if (!getConfig().getBoolean(CONFIG_FIX_DRAGON_Y_SPEED, true)) return;
-            if (!(event.getEntity() instanceof EnderDragon)) return;
+            if (!(event.getEntity() instanceof org.bukkit.entity.EnderDragon)) return;
             org.bukkit.entity.EnderDragon bukkitDragon = (org.bukkit.entity.EnderDragon) event.getEntity();
 
-            // 获取 NMS 实体
-            EnderDragon nmsDragon = ((CraftEnderDragon) bukkitDragon).getHandle();
+            // 通过通用 CraftEntity 获取 NMS 实体，避免硬编码版本包名
+            CraftEntity craftEntity = (CraftEntity) bukkitDragon;
+            EnderDragon nmsDragon = (EnderDragon) craftEntity.getHandle();
 
             // 获取相位管理器
             DragonPhaseManager phaseManager = nmsDragon.getPhaseManager();
@@ -2552,4 +2553,4 @@ public class IllegalStack extends JavaPlugin implements Listener {
         }
         dir.delete();
     }
-                 }
+    }
