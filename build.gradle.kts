@@ -1,13 +1,17 @@
+import org.gradle.jvm.toolchain.JavaLanguageVersion
+import org.gradle.jvm.toolchain.JavaToolchainSpec
+import org.gradle.api.attributes.java.TargetJvmVersion
+
 plugins {
     java
     `java-library`
     idea
     eclipse
-    id("io.papermc.paperweight.userdev") version "2.0.0-beta.14" // 检查最新版本
+    id("io.papermc.paperweight.userdev") version "2.0.0-beta.14"
 }
 
 repositories {
-    mavenCentral({
+    mavenCentral()
     maven {
         name = "OSS Sonatype"
         url = uri("https://oss.sonatype.org/content/repositories/snapshots/")
@@ -36,39 +40,49 @@ repositories {
 
 dependencies {
     compileOnly("dev.folia:folia-api:1.20.4-R0.1-SNAPSHOT")
-    // 添加 Paper Remapped Mojang 依赖以访问 NMS 类（如 NbtIo）
+    
+    // Paperweight dev bundle – 自动引入 paper-api 和映射好的 NMS
     paperweight.paperDevBundle("1.21.1-R0.1-SNAPSHOT")
-    compileOnly("io.papermc.paper:paper-api:1.21.1-R0.1-SNAPSHOT")
+    
     compileOnly("com.comphenix.protocol:ProtocolLib:5.3.0")
     compileOnly("com.elmakers.mine.bukkit:MagicAPI:10.2")
     compileOnly("de.tr7zw:item-nbt-api-plugin:2.8.0")
     compileOnly("com.github.TheBusyBiscuit:Slimefun4:RC-30") { isTransitive = false }
     compileOnly("io.netty:netty-all:4.1.110.Final") {
-        because("The version aligns with the version used by Minecraft itself." +
+        because("The version aligns with the version used by Minecraft itself. " +
                 "The minecraft server ships netty as well, so we don't need to include it in the jar.")
     }
     compileOnly("com.gmail.nossr50.mcMMO:mcMMO:2.1.217") { isTransitive = false }
     compileOnly("fr.minuskube.inv:smart-invs:1.2.7")
-    //compileOnly("com.github.CraftingStore.MinecraftPlugin:core:master-e366d322f8-1")
+    // compileOnly("com.github.CraftingStore.MinecraftPlugin:core:master-e366d322f8-1")
     compileOnly("com.github.brcdev-minecraft:shopgui-api:3.0.0")
 }
 
-the<JavaPluginExtension>().toolchain {
-    languageVersion.set(JavaLanguageVersion.of(21))
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
 }
 
 configurations.all {
-    attributes.attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 21)
+    attributes {
+        attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 21)
+    }
 }
 
-tasks.compileJava.configure {
-    options.release.set(21)
+tasks.compileJava {
+    options.release = 21
+    options.encoding = "UTF-8"
 }
 
 version = "3.0.00-Preview ExtraVer Jre21"
 
-tasks.named<Copy>("processResources") {
+tasks.processResources {
     filesMatching("plugin.yml") {
         expand("version" to project.version)
     }
+}
+
+tasks.assemble {
+    dependsOn(tasks.reobfJar)
 }
