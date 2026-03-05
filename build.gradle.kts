@@ -7,15 +7,7 @@ plugins {
 }
 
 repositories {
-    mavenCentral()
-    maven {
-    name = "阿里云中央仓库"
-    url = uri("https://maven.aliyun.com/repository/public")
-}
-maven {
-    name = "阿里云PaperMC镜像"
-    url = uri("https://maven.aliyun.com/repository/papermc")
-}
+    mavenCentral({
     maven {
         name = "OSS Sonatype"
         url = uri("https://oss.sonatype.org/content/repositories/snapshots/")
