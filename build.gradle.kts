@@ -3,6 +3,7 @@ plugins {
     `java-library`
     idea
     eclipse
+    id("io.papermc.paperweight.userdev") version "2.0.0-beta.14" // 检查最新版本
 }
 
 repositories {
@@ -36,6 +37,7 @@ repositories {
 dependencies {
     compileOnly("dev.folia:folia-api:1.20.4-R0.1-SNAPSHOT")
     // 添加 Paper Remapped Mojang 依赖以访问 NMS 类（如 NbtIo）
+    paperweight.paperDevBundle("1.21.1-R0.1-SNAPSHOT")
     compileOnly("io.papermc.paper:paper-api:1.21.1-R0.1-SNAPSHOT")
     compileOnly("com.comphenix.protocol:ProtocolLib:5.3.0")
     compileOnly("com.elmakers.mine.bukkit:MagicAPI:10.2")
