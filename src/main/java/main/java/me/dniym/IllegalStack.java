@@ -2128,7 +2128,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
             try (FileInputStream fis = new FileInputStream(levelFile);
                  GZIPInputStream gzis = new GZIPInputStream(fis)) {
                 // 1.21 需要 NbtAccounter 参数
-                CompoundTag root = NbtIo.readCompressed(gzis, NbtAccounter.UNLIMITED);
+                CompoundTag root = NbtIo.readCompressed(gzis, NbtAccounter.unlimitedHeap());
                 this.compound = root.getCompound("Data");
                 if (this.compound == null) throw new IOException("level.dat 中缺少 Data 标签");
             }
