@@ -90,17 +90,10 @@ import java.util.zip.GZIPOutputStream;
 import java.util.UUID;
 // -------------------------------------------------
 
-// ---------- 新增导入（用于末影龙修复，使用通用 CraftEntity）----------
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.NbtAccounter;
-import net.minecraft.nbt.NbtIo;
-import net.minecraft.nbt.StringTag;
-import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
-import net.minecraft.world.entity.boss.enderdragon.phases.DragonPhaseManager;
-import net.minecraft.world.entity.boss.enderdragon.phases.DragonPhaseInstance;
-import net.minecraft.world.phys.Vec3;
+// ---------- 新增导入（用于末影龙修复反射）----------
+import java.lang.reflect.Method;
 import org.bukkit.craftbukkit.entity.CraftEntity;
+import org.bukkit.entity.EnderDragon;
 // -------------------------------------------------
 
 public class IllegalStack extends JavaPlugin implements Listener {
@@ -565,9 +558,9 @@ public class IllegalStack extends JavaPlugin implements Listener {
         getServer().getPluginManager().registerEvents(new RestartBlocker(), this);
         // ---------------------------------------------
 
-        // ---------- 注册末影龙Y轴速度修复监听器 ----------
+        // ---------- 注册末影龙Y轴速度修复定时任务 ----------
         if (getConfig().getBoolean(CONFIG_FIX_DRAGON_Y_SPEED, true)) {
-            getServer().getPluginManager().registerEvents(new DragonYFixListener(), this);
+            Bukkit.getScheduler().runTaskTimer(this, new DragonYFixTask(), 0L, 1L);
             getLogger().info("已启用末影龙Y轴速度修复 (将0.01改为0.1)");
         }
         // ---------------------------------------------
@@ -743,9 +736,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
         getConfig().options().copyDefaults(true);
         saveConfig();
     }
-
-    // ---------- 以下为之前已实现的方法（setHasTraders, setHasStorage, updateConfig, loadMsgs, loadConfig, writeConfig, setVersion, getLbBlock, getMajorServerVersion 等）----------
-    // 为了确保编译通过，以下方法均已包含。
 
     private void setHasTraders() {
         try {
@@ -2117,7 +2107,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
     // ---------- 内部类：level.dat 编辑器（使用直接 NMS 调用，适配 1.21）----------
     private class LevelDatEditor {
         private final File levelFile;
-        private CompoundTag compound; // net.minecraft.nbt.CompoundTag
+        private net.minecraft.nbt.CompoundTag compound; // 使用全限定名避免导入冲突
         private final World world;
 
         public LevelDatEditor(World world) throws IOException {
@@ -2128,7 +2118,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
             try (FileInputStream fis = new FileInputStream(levelFile);
                  GZIPInputStream gzis = new GZIPInputStream(fis)) {
                 // 1.21 需要 NbtAccounter 参数
-                CompoundTag root = NbtIo.readCompressed(gzis, NbtAccounter.unlimitedHeap());
+                net.minecraft.nbt.CompoundTag root = net.minecraft.nbt.NbtIo.readCompressed(gzis, net.minecraft.nbt.NbtAccounter.unlimitedHeap());
                 this.compound = root.getCompound("Data");
                 if (this.compound == null) throw new IOException("level.dat 中缺少 Data 标签");
             }
@@ -2168,7 +2158,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
         }
 
         public List<String> getServerBrands() {
-            ListTag listTag = compound.getList("ServerBrands", 8); // 8 = TAG_String
+            net.minecraft.nbt.ListTag listTag = compound.getList("ServerBrands", 8); // 8 = TAG_String
             if (listTag == null) return new ArrayList<>();
             List<String> result = new ArrayList<>();
             for (int i = 0; i < listTag.size(); i++) {
@@ -2190,19 +2180,19 @@ public class IllegalStack extends JavaPlugin implements Listener {
         }
 
         private void setServerBrands(List<String> brands) {
-            ListTag listTag = new ListTag();
+            net.minecraft.nbt.ListTag listTag = new net.minecraft.nbt.ListTag();
             for (String s : brands) {
-                listTag.add(StringTag.valueOf(s));
+                listTag.add(net.minecraft.nbt.StringTag.valueOf(s));
             }
             compound.put("ServerBrands", listTag);
         }
 
         public void save() throws IOException {
-            CompoundTag root = new CompoundTag();
+            net.minecraft.nbt.CompoundTag root = new net.minecraft.nbt.CompoundTag();
             root.put("Data", compound);
             try (FileOutputStream fos = new FileOutputStream(levelFile);
                  GZIPOutputStream gzos = new GZIPOutputStream(fos)) {
-                NbtIo.writeCompressed(root, gzos);
+                net.minecraft.nbt.NbtIo.writeCompressed(root, gzos);
             }
         }
     }
@@ -2261,60 +2251,104 @@ public class IllegalStack extends JavaPlugin implements Listener {
         }
     }
 
-    // ---------- 内部监听器：末影龙Y轴速度修复（使用通用 CraftEntity 获取 NMS 实体）----------
-    private class DragonYFixListener implements Listener {
+    // ---------- 新增：末影龙Y轴速度修复任务（基于反射）----------
+    private class DragonYFixTask implements Runnable {
+        private Method getPhaseManager;
+        private Method getCurrentPhase;
+        private Method getFlyTargetLocation;
+        private Method getFlySpeed;
+        private Method getDeltaMovement;
+        private Method setDeltaMovement;
+        private Method vecX, vecY, vecZ;
+        private Class<?> vec3Class;
+        private java.lang.reflect.Constructor<?> vec3Constructor;
 
-        @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-        public void onEntityTick(org.bukkit.event.entity.EntityTickEvent event) {
-            if (!getConfig().getBoolean(CONFIG_FIX_DRAGON_Y_SPEED, true)) return;
-            if (!(event.getEntity() instanceof org.bukkit.entity.EnderDragon)) return;
-            org.bukkit.entity.EnderDragon bukkitDragon = (org.bukkit.entity.EnderDragon) event.getEntity();
+        public DragonYFixTask() {
+            try {
+                // 预先获取反射方法
+                Class<?> entityClass = Class.forName("net.minecraft.world.entity.Entity");
+                getDeltaMovement = entityClass.getMethod("getDeltaMovement");
+                setDeltaMovement = entityClass.getMethod("setDeltaMovement", Class.forName("net.minecraft.world.phys.Vec3"));
 
-            // 通过通用 CraftEntity 获取 NMS 实体，避免硬编码版本包名
-            CraftEntity craftEntity = (CraftEntity) bukkitDragon;
-            EnderDragon nmsDragon = (EnderDragon) craftEntity.getHandle();
+                Class<?> enderDragonClass = Class.forName("net.minecraft.world.entity.boss.enderdragon.EnderDragon");
+                getPhaseManager = enderDragonClass.getMethod("getPhaseManager");
 
-            // 获取相位管理器
-            DragonPhaseManager phaseManager = nmsDragon.getPhaseManager();
-            if (phaseManager == null) return;
+                Class<?> phaseManagerClass = Class.forName("net.minecraft.world.entity.boss.enderdragon.phases.DragonPhaseManager");
+                getCurrentPhase = phaseManagerClass.getMethod("getCurrentPhase");
 
-            // 获取当前相位
-            DragonPhaseInstance currentPhase = phaseManager.getCurrentPhase();
-            if (currentPhase == null) return;
+                Class<?> phaseInstanceClass = Class.forName("net.minecraft.world.entity.boss.enderdragon.phases.DragonPhaseInstance");
+                getFlyTargetLocation = phaseInstanceClass.getMethod("getFlyTargetLocation");
+                getFlySpeed = phaseInstanceClass.getMethod("getFlySpeed");
 
-            // 获取飞行目标
-            Vec3 targetLocation = currentPhase.getFlyTargetLocation();
-            if (targetLocation == null) return;
-
-            double tx = targetLocation.x;
-            double ty = targetLocation.y;
-            double tz = targetLocation.z;
-
-            double x = nmsDragon.getX();
-            double y = nmsDragon.getY();
-            double z = nmsDragon.getZ();
-
-            double xdd = tx - x;
-            double ydd = ty - y;
-            double zdd = tz - z;
-
-            float max = currentPhase.getFlySpeed();
-            double horizontalDist = Math.sqrt(zdd * zdd + xdd * xdd);
-            if (horizontalDist > 0.0D) {
-                ydd = Math.max(-max, Math.min(ydd / horizontalDist, max));
+                vec3Class = Class.forName("net.minecraft.world.phys.Vec3");
+                vecX = vec3Class.getMethod("x");
+                vecY = vec3Class.getMethod("y");
+                vecZ = vec3Class.getMethod("z");
+                vec3Constructor = vec3Class.getConstructor(double.class, double.class, double.class);
+            } catch (Exception e) {
+                getLogger().warning("无法初始化末影龙修复反射，功能将不可用：" + e.getMessage());
             }
+        }
 
-            // 获取当前运动
-            Vec3 delta = nmsDragon.getDeltaMovement();
-            double dx = delta.x;
-            double dy = delta.y;
-            double dz = delta.z;
+        @Override
+        public void run() {
+            if (!getConfig().getBoolean(CONFIG_FIX_DRAGON_Y_SPEED, true)) return;
+            if (getPhaseManager == null) return; // 反射初始化失败
 
-            // 修正系数：原版是0.01，改为0.1
-            dy += ydd * 0.1D;
+            for (World world : Bukkit.getWorlds()) {
+                for (EnderDragon dragon : world.getEntitiesByClass(EnderDragon.class)) {
+                    applyFix(dragon);
+                }
+            }
+        }
 
-            // 设置新的运动
-            nmsDragon.setDeltaMovement(new Vec3(dx, dy, dz));
+        private void applyFix(EnderDragon dragon) {
+            try {
+                CraftEntity craftEntity = (CraftEntity) dragon;
+                Object nmsEntity = craftEntity.getHandle(); // net.minecraft.world.entity.boss.enderdragon.EnderDragon
+
+                // 获取相位管理器
+                Object phaseManager = getPhaseManager.invoke(nmsEntity);
+                if (phaseManager == null) return;
+
+                // 获取当前相位
+                Object currentPhase = getCurrentPhase.invoke(phaseManager);
+                if (currentPhase == null) return;
+
+                // 获取飞行目标
+                Object targetLocation = getFlyTargetLocation.invoke(currentPhase);
+                if (targetLocation == null) return;
+
+                double tx = (double) vecX.invoke(targetLocation);
+                double ty = (double) vecY.invoke(targetLocation);
+                double tz = (double) vecZ.invoke(targetLocation);
+
+                double x = ((Number) nmsEntity.getClass().getMethod("getX").invoke(nmsEntity)).doubleValue();
+                double y = ((Number) nmsEntity.getClass().getMethod("getY").invoke(nmsEntity)).doubleValue();
+                double z = ((Number) nmsEntity.getClass().getMethod("getZ").invoke(nmsEntity)).doubleValue();
+
+                double xdd = tx - x;
+                double ydd = ty - y;
+                double zdd = tz - z;
+
+                float max = (float) getFlySpeed.invoke(currentPhase);
+                double horizontalDist = Math.sqrt(zdd * zdd + xdd * xdd);
+                if (horizontalDist > 0.0D) {
+                    ydd = Math.max(-max, Math.min(ydd / horizontalDist, max));
+                }
+
+                Object delta = getDeltaMovement.invoke(nmsEntity);
+                double dx = (double) vecX.invoke(delta);
+                double dy = (double) vecY.invoke(delta);
+                double dz = (double) vecZ.invoke(delta);
+
+                dy += ydd * 0.1D; // 修正系数
+
+                Object newDelta = vec3Constructor.newInstance(dx, dy, dz);
+                setDeltaMovement.invoke(nmsEntity, newDelta);
+            } catch (Exception e) {
+                // 静默失败
+            }
         }
     }
 
@@ -2553,4 +2587,4 @@ public class IllegalStack extends JavaPlugin implements Listener {
         }
         dir.delete();
     }
-    }
+            }
