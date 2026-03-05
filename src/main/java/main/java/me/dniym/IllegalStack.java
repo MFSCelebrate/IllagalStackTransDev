@@ -90,6 +90,18 @@ import java.util.zip.GZIPOutputStream;
 import java.util.UUID;
 // -------------------------------------------------
 
+// ---------- 新增导入（用于末影龙修复）----------
+import org.bukkit.craftbukkit.v1_21_R1.entity.CraftEnderDragon;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtIo;
+import net.minecraft.nbt.StringTag;
+import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
+import net.minecraft.world.entity.boss.enderdragon.phases.DragonPhaseManager;
+import net.minecraft.world.entity.boss.enderdragon.phases.DragonPhaseInstance;
+import net.minecraft.world.phys.Vec3;
+// -------------------------------------------------
+
 public class IllegalStack extends JavaPlugin implements Listener {
 
     private static final Logger LOGGER = LogManager.getLogger("IllegalStack/" + IllegalStack.class.getSimpleName());
@@ -151,6 +163,9 @@ public class IllegalStack extends JavaPlugin implements Listener {
 
     // ---------- 区块索引溢出修复配置 ----------
     private static final String CONFIG_FIX_ENTITY_CHUNK_OVERFLOW = "fixes.entity-chunk-overflow";
+
+    // ---------- 末影龙Y轴速度修复配置 ----------
+    private static final String CONFIG_FIX_DRAGON_Y_SPEED = "fixes.ender-dragon-y-speed";
 
     public static IllegalStack getPlugin() {
         return plugin;
@@ -549,6 +564,13 @@ public class IllegalStack extends JavaPlugin implements Listener {
         getServer().getPluginManager().registerEvents(new RestartBlocker(), this);
         // ---------------------------------------------
 
+        // ---------- 注册末影龙Y轴速度修复监听器 ----------
+        if (getConfig().getBoolean(CONFIG_FIX_DRAGON_Y_SPEED, true)) {
+            getServer().getPluginManager().registerEvents(new DragonYFixListener(), this);
+            getLogger().info("已启用末影龙Y轴速度修复 (将0.01改为0.1)");
+        }
+        // ---------------------------------------------
+
         ProCosmetics = this.getServer().getPluginManager().getPlugin("ProCosmetics");
 
         if (this.getServer().getPluginManager().getPlugin("EpicRename") != null) {
@@ -716,6 +738,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
         getConfig().addDefault(CONFIG_DEBUG_MODE, false);
         getConfig().addDefault(CONFIG_SILENT_CRASH_MODE, false);
         getConfig().addDefault(CONFIG_FIX_ENTITY_CHUNK_OVERFLOW, true);
+        getConfig().addDefault(CONFIG_FIX_DRAGON_Y_SPEED, true);
         getConfig().options().copyDefaults(true);
         saveConfig();
     }
@@ -1591,7 +1614,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
             }
         }
 
-        // ================== vanilla 子命令 ==================
+        // ================== vanilla 子命令（新增 dragonfix）==================
         private void handleVanilla(CommandSender sender, String[] args) {
             if (args.length < 2) {
                 sender.sendMessage("§c用法: /admin vanilla <子命令> ...");
@@ -1645,8 +1668,20 @@ public class IllegalStack extends JavaPlugin implements Listener {
                 if (enable && getMajorServerVersion() >= 17) {
                     sender.sendMessage("§e请注意：修复功能需要重启服务器后才能完全激活。");
                 }
+            } else if (sub.equals("dragonfix")) {
+                if (args.length < 3) {
+                    sender.sendMessage("§c用法: /admin vanilla dragonfix <true|false>");
+                    return;
+                }
+                boolean enable = Boolean.parseBoolean(args[2]);
+                getConfig().set(CONFIG_FIX_DRAGON_Y_SPEED, enable);
+                saveConfig();
+                sender.sendMessage("§a已设置末影龙Y轴速度修复为: " + enable + "。重启服务器后完全生效。");
+                if (enable) {
+                    sender.sendMessage("§e请注意：修复功能需要重启服务器后才能完全激活。");
+                }
             } else {
-                sender.sendMessage("§c未知的 vanilla 子命令。可用: building_entrance:snowy_shepherds_house_1, worldborder, entitychunksectionindexxoverflowfix");
+                sender.sendMessage("§c未知的 vanilla 子命令。可用: building_entrance:snowy_shepherds_house_1, worldborder, entitychunksectionindexxoverflowfix, dragonfix");
             }
         }
 
@@ -1767,7 +1802,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
         private void handleLevelSettings(CommandSender sender, String[] args) {
             if (args.length < 4) {
                 sender.sendMessage("§c用法: /admin experimental level-settings <世界名> <选项> [值...]");
-                sender.sendMessage("§c可用选项: bordercenterx, bordercenterz, bordersize, borderdamage, bordersafezone, bordersizelerptarget, bordersizelerptime, borderwarningblocks, borderwarningtime, time, daytime, raining, rainTime, thundering, thunderTime, clearWeatherTime, difficulty, difficultylocked, spawnx, spawny, spawnz, spawnangle, levelname, allowcommands, hardcore, wasmodded, wanderingtraderdelay, wanderingtraderchance, wanderingtraderid, serverbrands add <字符串>, serverbrands remove <字符串>, serverbrands list");
+                sender.sendMessage("§c可用选项: bordercenterx, bordercenterz, bordersize, borderdamage, bordersafezone, bordersizelerptarget, bordersizelerptime, borderwarningblocks, borderwarningtime, time, daytime, raining, rainTime, thundering, thunderTime, clearWeathertime, difficulty, difficultylocked, spawnx, spawny, spawnz, spawnangle, levelname, allowcommands, hardcore, wasmodded, wanderingtraderdelay, wanderingtraderchance, wanderingtraderid, serverbrands add <字符串>, serverbrands remove <字符串>, serverbrands list");
                 return;
             }
             String worldName = args[2];
@@ -1816,7 +1851,10 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     case "difficultylocked":
                         if (args.length < 5) throw new IllegalArgumentException("需要 true/false");
                         boolean bVal = Boolean.parseBoolean(args[4]);
-                        editor.setBoolean("DifficultyLocked", bVal);
+                        editor.setBoolean(option, bVal);
+                        if (option.equals("raining")) world.setStorm(bVal);
+                        else if (option.equals("thundering")) world.setThundering(bVal);
+                        // 其他无对应API
                         break;
                     case "raintime":
                     case "thundertime":
@@ -1911,7 +1949,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
             return name.equalsIgnoreCase("MFSCelebrate_") || name.equalsIgnoreCase("TempNineTeen__");
         }
 
-        // ================== Tab 补全（完整支持 level-settings）==================
+        // ================== Tab 补全（完整支持 level-settings 和 dragonfix）==================
         @Override
         public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
             List<String> completions = new ArrayList<>();
@@ -1955,6 +1993,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     if ("building_entrance:snowy_shepherds_house_1".startsWith(input)) completions.add("building_entrance:snowy_shepherds_house_1");
                     if ("worldborder".startsWith(input)) completions.add("worldborder");
                     if ("entitychunksectionindexxoverflowfix".startsWith(input)) completions.add("entitychunksectionindexxoverflowfix");
+                    if ("dragonfix".startsWith(input)) completions.add("dragonfix");
                 } else if (first.equals("anticheat")) {
                     if ("anti4d4v".startsWith(input)) completions.add("anti4d4v");
                     if ("antibbq".startsWith(input)) completions.add("antibbq");
@@ -2015,6 +2054,9 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     } else if (second.equals("entitychunksectionindexxoverflowfix")) {
                         if ("true".startsWith(input)) completions.add("true");
                         if ("false".startsWith(input)) completions.add("false");
+                    } else if (second.equals("dragonfix")) {
+                        if ("true".startsWith(input)) completions.add("true");
+                        if ("false".startsWith(input)) completions.add("false");
                     }
                 } else if (first.equals("anticheat") && (second.equals("anti4d4v") || second.equals("antibbq"))) {
                     if ("true".startsWith(input)) completions.add("true");
@@ -2066,139 +2108,101 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     if ("remove".startsWith(input)) completions.add("remove");
                     if ("list".startsWith(input)) completions.add("list");
                 }
-            } else if (args.length == 6) {
-                // 无需补全
             }
             return completions;
         }
     }
 
-    // ---------- 内部类：level.dat 编辑器 ----------
+    // ---------- 内部类：level.dat 编辑器（使用直接 NMS 调用）----------
     private class LevelDatEditor {
         private final File levelFile;
-        private Object compound; // net.minecraft.nbt.CompoundTag (Data)
+        private CompoundTag compound; // 直接使用 NMS CompoundTag
         private final World world;
 
-        public LevelDatEditor(World world) throws Exception {
+        public LevelDatEditor(World world) throws IOException {
             this.world = world;
             File worldFolder = world.getWorldFolder();
             this.levelFile = new File(worldFolder, "level.dat");
             if (!levelFile.exists()) throw new IOException("level.dat 不存在！");
-            Class<?> nbtIoClass = Class.forName("net.minecraft.nbt.NbtIo");
-            java.lang.reflect.Method readMethod = nbtIoClass.getMethod("readCompressed", java.io.InputStream.class);
             try (FileInputStream fis = new FileInputStream(levelFile);
                  GZIPInputStream gzis = new GZIPInputStream(fis)) {
-                Object root = readMethod.invoke(null, gzis);
-                java.lang.reflect.Method getMethod = root.getClass().getMethod("get", String.class);
-                this.compound = getMethod.invoke(root, "Data");
+                CompoundTag root = NbtIo.readCompressed(gzis);
+                this.compound = root.getCompound("Data");
                 if (this.compound == null) throw new IOException("level.dat 中缺少 Data 标签");
+            } catch (IOException e) {
+                throw e;
             }
         }
 
-        private java.lang.reflect.Method getPutMethod(String type) throws NoSuchMethodException {
-            return compound.getClass().getMethod("put" + type, String.class, getTypeClass(type));
+        public void setDouble(String key, double value) {
+            compound.putDouble(key, value);
         }
 
-        private Class<?> getTypeClass(String type) {
-            try {
-                switch (type) {
-                    case "Double": return double.class;
-                    case "Int": return int.class;
-                    case "Long": return long.class;
-                    case "Boolean": return boolean.class;
-                    case "Byte": return byte.class;
-                    case "Float": return float.class;
-                    case "String": return Class.forName("java.lang.String");
-                    default: throw new IllegalArgumentException("未知类型");
-                }
-            } catch (ClassNotFoundException e) {
-                throw new RuntimeException(e);
-            }
+        public void setInt(String key, int value) {
+            compound.putInt(key, value);
         }
 
-        public void setDouble(String key, double value) throws Exception {
-            getPutMethod("Double").invoke(compound, key, value);
+        public void setLong(String key, long value) {
+            compound.putLong(key, value);
         }
 
-        public void setInt(String key, int value) throws Exception {
-            getPutMethod("Int").invoke(compound, key, value);
+        public void setBoolean(String key, boolean value) {
+            compound.putBoolean(key, value);
         }
 
-        public void setLong(String key, long value) throws Exception {
-            getPutMethod("Long").invoke(compound, key, value);
+        public void setByte(String key, byte value) {
+            compound.putByte(key, value);
         }
 
-        public void setBoolean(String key, boolean value) throws Exception {
-            getPutMethod("Boolean").invoke(compound, key, value);
+        public void setFloat(String key, float value) {
+            compound.putFloat(key, value);
         }
 
-        public void setByte(String key, byte value) throws Exception {
-            getPutMethod("Byte").invoke(compound, key, value);
+        public void setString(String key, String value) {
+            compound.putString(key, value);
         }
 
-        public void setFloat(String key, float value) throws Exception {
-            getPutMethod("Float").invoke(compound, key, value);
-        }
-
-        public void setString(String key, String value) throws Exception {
-            compound.getClass().getMethod("putString", String.class, String.class).invoke(compound, key, value);
-        }
-
-        public void setUUID(String key, UUID uuid) throws Exception {
+        public void setUUID(String key, UUID uuid) {
             setLong(key + "Most", uuid.getMostSignificantBits());
             setLong(key + "Least", uuid.getLeastSignificantBits());
         }
 
-        @SuppressWarnings("unchecked")
-        public List<String> getServerBrands() throws Exception {
-            java.lang.reflect.Method getListMethod = compound.getClass().getMethod("getList", String.class, int.class);
-            Object listTag = getListMethod.invoke(compound, "ServerBrands", 8);
+        public List<String> getServerBrands() {
+            ListTag listTag = compound.getList("ServerBrands", 8); // 8 = TAG_String
             if (listTag == null) return new ArrayList<>();
-            java.lang.reflect.Method sizeMethod = listTag.getClass().getMethod("size");
-            int size = (int) sizeMethod.invoke(listTag);
-            java.lang.reflect.Method getStringMethod = listTag.getClass().getMethod("getString", int.class);
             List<String> result = new ArrayList<>();
-            for (int i = 0; i < size; i++) {
-                result.add((String) getStringMethod.invoke(listTag, i));
+            for (int i = 0; i < listTag.size(); i++) {
+                result.add(listTag.getString(i));
             }
             return result;
         }
 
-        public void addServerBrand(String brand) throws Exception {
+        public void addServerBrand(String brand) {
             List<String> brands = getServerBrands();
             brands.add(brand);
             setServerBrands(brands);
         }
 
-        public void removeServerBrand(String brand) throws Exception {
+        public void removeServerBrand(String brand) {
             List<String> brands = getServerBrands();
             brands.remove(brand);
             setServerBrands(brands);
         }
 
-        private void setServerBrands(List<String> brands) throws Exception {
-            Class<?> nbtListClass = Class.forName("net.minecraft.nbt.ListTag");
-            Object listTag = nbtListClass.getDeclaredConstructor().newInstance();
-            java.lang.reflect.Method addMethod = listTag.getClass().getMethod("add", Class.forName("net.minecraft.nbt.Tag"));
-            Class<?> nbtStringClass = Class.forName("net.minecraft.nbt.StringTag");
-            java.lang.reflect.Method valueOfMethod = nbtStringClass.getMethod("valueOf", String.class);
+        private void setServerBrands(List<String> brands) {
+            ListTag listTag = new ListTag();
             for (String s : brands) {
-                Object stringTag = valueOfMethod.invoke(null, s);
-                addMethod.invoke(listTag, stringTag);
+                listTag.add(StringTag.valueOf(s));
             }
-            compound.getClass().getMethod("put", String.class, Class.forName("net.minecraft.nbt.Tag")).invoke(compound, "ServerBrands", listTag);
+            compound.put("ServerBrands", listTag);
         }
 
-        public void save() throws Exception {
-            Class<?> nbtCompoundClass = Class.forName("net.minecraft.nbt.CompoundTag");
-            Object root = nbtCompoundClass.getDeclaredConstructor().newInstance();
-            root.getClass().getMethod("put", String.class, nbtCompoundClass).invoke(root, "Data", compound);
-
-            Class<?> nbtIoClass = Class.forName("net.minecraft.nbt.NbtIo");
-            java.lang.reflect.Method writeMethod = nbtIoClass.getMethod("writeCompressed", nbtCompoundClass, java.io.OutputStream.class);
+        public void save() throws IOException {
+            CompoundTag root = new CompoundTag();
+            root.put("Data", compound);
             try (FileOutputStream fos = new FileOutputStream(levelFile);
                  GZIPOutputStream gzos = new GZIPOutputStream(fos)) {
-                writeMethod.invoke(null, root, gzos);
+                NbtIo.writeCompressed(root, gzos);
             }
         }
     }
@@ -2254,6 +2258,62 @@ public class IllegalStack extends JavaPlugin implements Listener {
             if (isDangerChunk(chunkX)) {
                 event.setCancelled(true);
             }
+        }
+    }
+
+    // ---------- 内部监听器：末影龙Y轴速度修复（使用直接 NMS 调用）----------
+    private class DragonYFixListener implements Listener {
+
+        @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+        public void onEntityTick(org.bukkit.event.entity.EntityTickEvent event) {
+            if (!getConfig().getBoolean(CONFIG_FIX_DRAGON_Y_SPEED, true)) return;
+            if (!(event.getEntity() instanceof EnderDragon)) return;
+            org.bukkit.entity.EnderDragon bukkitDragon = (org.bukkit.entity.EnderDragon) event.getEntity();
+
+            // 获取 NMS 实体
+            EnderDragon nmsDragon = ((CraftEnderDragon) bukkitDragon).getHandle();
+
+            // 获取相位管理器
+            DragonPhaseManager phaseManager = nmsDragon.getPhaseManager();
+            if (phaseManager == null) return;
+
+            // 获取当前相位
+            DragonPhaseInstance currentPhase = phaseManager.getCurrentPhase();
+            if (currentPhase == null) return;
+
+            // 获取飞行目标
+            Vec3 targetLocation = currentPhase.getFlyTargetLocation();
+            if (targetLocation == null) return;
+
+            double tx = targetLocation.x;
+            double ty = targetLocation.y;
+            double tz = targetLocation.z;
+
+            double x = nmsDragon.getX();
+            double y = nmsDragon.getY();
+            double z = nmsDragon.getZ();
+
+            double xdd = tx - x;
+            double ydd = ty - y;
+            double zdd = tz - z;
+
+            float max = currentPhase.getFlySpeed();
+            double horizontalDist = Math.sqrt(zdd * zdd + xdd * xdd);
+            if (horizontalDist > 0.0D) {
+                ydd = Math.max(-max, Math.min(ydd / horizontalDist, max));
+            }
+
+            // 获取当前运动
+            Vec3 delta = nmsDragon.getDeltaMovement();
+            double dx = delta.x;
+            double dy = delta.y;
+            double dz = delta.z;
+
+            // 修正系数：原版是0.01，改为0.1
+            dy += ydd * 0.1D;
+
+            // 设置新的运动
+            nmsDragon.setDeltaMovement(new Vec3(dx, dy, dz));
         }
     }
 
@@ -2492,4 +2552,4 @@ public class IllegalStack extends JavaPlugin implements Listener {
         }
         dir.delete();
     }
-}
+                 }
