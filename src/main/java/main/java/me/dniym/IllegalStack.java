@@ -2115,10 +2115,9 @@ public class IllegalStack extends JavaPlugin implements Listener {
             File worldFolder = world.getWorldFolder();
             this.levelFile = new File(worldFolder, "level.dat");
             if (!levelFile.exists()) throw new IOException("level.dat 不存在！");
-            try (FileInputStream fis = new FileInputStream(levelFile);
-                 GZIPInputStream gzis = new GZIPInputStream(fis)) {
-                // 1.21 需要 NbtAccounter 参数
-                net.minecraft.nbt.CompoundTag root = net.minecraft.nbt.NbtIo.readCompressed(gzis, net.minecraft.nbt.NbtAccounter.unlimitedHeap());
+            // 直接传递 FileInputStream，NbtIo.readCompressed 内部会处理 GZIP 解压
+            try (FileInputStream fis = new FileInputStream(levelFile)) {
+                net.minecraft.nbt.CompoundTag root = net.minecraft.nbt.NbtIo.readCompressed(fis, net.minecraft.nbt.NbtAccounter.unlimitedHeap());
                 this.compound = root.getCompound("Data");
                 if (this.compound == null) throw new IOException("level.dat 中缺少 Data 标签");
             }
@@ -2190,9 +2189,9 @@ public class IllegalStack extends JavaPlugin implements Listener {
         public void save() throws IOException {
             net.minecraft.nbt.CompoundTag root = new net.minecraft.nbt.CompoundTag();
             root.put("Data", compound);
-            try (FileOutputStream fos = new FileOutputStream(levelFile);
-                 GZIPOutputStream gzos = new GZIPOutputStream(fos)) {
-                net.minecraft.nbt.NbtIo.writeCompressed(root, gzos);
+            // 直接传递 FileOutputStream，NbtIo.writeCompressed 内部会进行 GZIP 压缩
+            try (FileOutputStream fos = new FileOutputStream(levelFile)) {
+                net.minecraft.nbt.NbtIo.writeCompressed(root, fos);
             }
         }
     }
