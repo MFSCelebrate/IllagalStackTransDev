@@ -9,6 +9,9 @@ softdepend: [Magic, Factions, NBTAPI, ProtocolLib, Slimefun, CraftingStore, Dyna
 loadbefore: [MythicDrops]
 website: https://www.spigotmc.org/resources/44411/
 commands:
+  tpa-player:
+    description: TPA 传送系统
+    usage: /tpa-player <access|deny|to|setting> ...
   istack:
     description: 允许使用 /istack 指令调试该插件。
     permission: illegalstack.help
@@ -39,6 +42,7 @@ permissions:
   illegalstack.serverchat:
     description: 此权限已弃用，原功能已合并至 /admin chat。
     default: op
+
 
 
 
