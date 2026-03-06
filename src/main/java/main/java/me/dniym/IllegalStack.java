@@ -2424,22 +2424,23 @@ public class IllegalStack extends JavaPlugin implements Listener {
         }
     }
 
+    // ---------- TPA 请求内部类 ----------
+    private static class TpaRequest {
+        UUID requester;
+        UUID target;
+        BukkitTask timeoutTask;
+        long timestamp;
+
+        TpaRequest(UUID requester, UUID target, BukkitTask timeoutTask) {
+            this.requester = requester;
+            this.target = target;
+            this.timeoutTask = timeoutTask;
+            this.timestamp = System.currentTimeMillis();
+        }
+    }
+
     // ---------- 新增：TPA 玩家命令 ----------
     private class TpaPlayerCommand implements TabExecutor {
-
-        private class TpaRequest {
-            UUID requester;
-            UUID target;
-            BukkitTask timeoutTask;
-            long timestamp;
-
-            TpaRequest(UUID requester, UUID target, BukkitTask timeoutTask) {
-                this.requester = requester;
-                this.target = target;
-                this.timeoutTask = timeoutTask;
-                this.timestamp = System.currentTimeMillis();
-            }
-        }
 
         @Override
         public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
@@ -2779,55 +2780,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
         }
     }
 
-    // ---------- 移动事件，取消请求 ----------
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    public void onPlayerMove(PlayerMoveEvent event) {
-        if (event.getFrom().getBlockX() == event.getTo().getBlockX() &&
-            event.getFrom().getBlockY() == event.getTo().getBlockY() &&
-            event.getFrom().getBlockZ() == event.getTo().getBlockZ()) {
-            return; // 忽略视角移动
-        }
-        Player player = event.getPlayer();
-        // 如果玩家是请求者，取消他发出的所有请求（通常只有一个）
-        for (TpaRequest req : pendingRequests.values()) {
-            if (req.requester.equals(player.getUniqueId())) {
-                // 取消请求
-                req.timeoutTask.cancel();
-                pendingRequests.remove(req.target);
-                Player target = Bukkit.getPlayer(req.target);
-                if (target != null && target.isOnline()) {
-                    target.sendMessage("§c发送者 §6" + player.getName() + " §c移动了，传送请求已取消。");
-                }
-                player.sendMessage("§c你移动了，传送请求已取消。");
-                break; // 每个玩家只能有一个请求
-            }
-        }
-    }
-
-    // ---------- 自定义世界边界相关方法 ----------
-    public void setCustomWorldBorder(String worldName, double diameter) {
-        String path = CONFIG_WORLDS + "." + worldName + ".diameter";
-        getConfig().set(path, diameter);
-        saveConfig();
-        getLogger().info("世界 " + worldName + " 自定义边界已启用，直径: " + diameter);
-    }
-
-    public void disableCustomWorldBorder(String worldName) {
-        String path = CONFIG_WORLDS + "." + worldName;
-        getConfig().set(path, null);
-        saveConfig();
-        getLogger().info("世界 " + worldName + " 自定义边界已禁用。");
-    }
-
-    private boolean isWorldBorderEnabled(World world) {
-        return getConfig().contains(CONFIG_WORLDS + "." + world.getName() + ".diameter");
-    }
-
-    private double getWorldBorderDiameter(World world) {
-        return getConfig().getDouble(CONFIG_WORLDS + "." + world.getName() + ".diameter", -1);
-    }
-
-    // ---------- 边界监听器 ----------
+    // ---------- 合并后的移动事件，同时处理边界和 TPA 取消 ----------
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPlayerMove(PlayerMoveEvent event) {
         Player player = event.getPlayer();
@@ -2836,6 +2789,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
         World world = to.getWorld();
         if (world == null) return;
 
+        // 先处理边界
         double x = to.getX();
         double z = to.getZ();
         double absX = Math.abs(x);
@@ -2869,6 +2823,27 @@ public class IllegalStack extends JavaPlugin implements Listener {
                 }
             });
         }
+
+        // 然后处理 TPA 取消：检查是否真的移动了方块
+        if (event.getFrom().getBlockX() == to.getBlockX() &&
+            event.getFrom().getBlockY() == to.getBlockY() &&
+            event.getFrom().getBlockZ() == to.getBlockZ()) {
+            return; // 忽略视角移动
+        }
+
+        // 如果玩家是请求者，取消他发出的所有请求（通常只有一个）
+        for (TpaRequest req : pendingRequests.values()) {
+            if (req.requester.equals(player.getUniqueId())) {
+                req.timeoutTask.cancel();
+                pendingRequests.remove(req.target);
+                Player target = Bukkit.getPlayer(req.target);
+                if (target != null && target.isOnline()) {
+                    target.sendMessage("§c发送者 §6" + player.getName() + " §c移动了，传送请求已取消。");
+                }
+                player.sendMessage("§c你移动了，传送请求已取消。");
+                break; // 每个玩家只能有一个请求
+            }
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -2893,6 +2868,29 @@ public class IllegalStack extends JavaPlugin implements Listener {
                 world.getChunkAtAsync(chunkX, chunkZ, (c) -> c.setForceLoaded(true));
             }
         }
+    }
+
+    // ---------- 自定义世界边界相关方法 ----------
+    public void setCustomWorldBorder(String worldName, double diameter) {
+        String path = CONFIG_WORLDS + "." + worldName + ".diameter";
+        getConfig().set(path, diameter);
+        saveConfig();
+        getLogger().info("世界 " + worldName + " 自定义边界已启用，直径: " + diameter);
+    }
+
+    public void disableCustomWorldBorder(String worldName) {
+        String path = CONFIG_WORLDS + "." + worldName;
+        getConfig().set(path, null);
+        saveConfig();
+        getLogger().info("世界 " + worldName + " 自定义边界已禁用。");
+    }
+
+    private boolean isWorldBorderEnabled(World world) {
+        return getConfig().contains(CONFIG_WORLDS + "." + world.getName() + ".diameter");
+    }
+
+    private double getWorldBorderDiameter(World world) {
+        return getConfig().getDouble(CONFIG_WORLDS + "." + world.getName() + ".diameter", -1);
     }
 
     // ---------- 数据包部署方法 ----------
