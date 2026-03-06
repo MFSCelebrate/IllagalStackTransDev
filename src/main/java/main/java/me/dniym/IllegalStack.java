@@ -53,6 +53,8 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 
 // ---------- 新增导入 ----------
 import org.bukkit.command.Command;
@@ -94,6 +96,16 @@ import java.util.UUID;
 import java.lang.reflect.Method;
 import org.bukkit.craftbukkit.entity.CraftEntity;
 import org.bukkit.entity.EnderDragon;
+// -------------------------------------------------
+
+// ---------- 新增导入（用于 tpa 功能）----------
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.UUID;
+import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.scheduler.BukkitRunnable;
 // -------------------------------------------------
 
 public class IllegalStack extends JavaPlugin implements Listener {
@@ -160,6 +172,14 @@ public class IllegalStack extends JavaPlugin implements Listener {
 
     // ---------- 末影龙Y轴速度修复配置 ----------
     private static final String CONFIG_FIX_DRAGON_Y_SPEED = "fixes.ender-dragon-y-speed";
+
+    // ---------- TPA 相关 ----------
+    private final Map<UUID, TpaRequest> pendingRequests = new HashMap<>();
+    private final Map<UUID, Set<UUID>> blacklist = new HashMap<>();
+
+    // ---------- 外部命令执行相关 ----------
+    private static final String CONFIG_EXECUTE_COMMANDS = "ExecuteCommands_WithPlugins";
+    private BukkitTask commandExecutorTask;
 
     public static IllegalStack getPlugin() {
         return plugin;
@@ -543,6 +563,16 @@ public class IllegalStack extends JavaPlugin implements Listener {
         }
         // -----------------------------------------
 
+        // ---------- 注册 /tpa-player 命令 ----------
+        TpaPlayerCommand tpaPlayerCommand = new TpaPlayerCommand();
+        if (this.getCommand("tpa-player") != null) {
+            this.getCommand("tpa-player").setExecutor(tpaPlayerCommand);
+            this.getCommand("tpa-player").setTabCompleter(tpaPlayerCommand);
+        } else {
+            getLogger().warning("命令 /tpa-player 未在 plugin.yml 中定义，注册失败！");
+        }
+        // -----------------------------------------
+
         // ---------- 注册自定义边界监听器和反作弊监听器 ----------
         getServer().getPluginManager().registerEvents(this, this);
         // -----------------------------------------
@@ -563,6 +593,10 @@ public class IllegalStack extends JavaPlugin implements Listener {
             Bukkit.getScheduler().runTaskTimer(this, new DragonYFixTask(), 0L, 1L);
             getLogger().info("已启用末影龙Y轴速度修复 (将0.01改为0.1)");
         }
+        // ---------------------------------------------
+
+        // ---------- 启动外部命令执行检查任务 ----------
+        startCommandExecutorTask();
         // ---------------------------------------------
 
         ProCosmetics = this.getServer().getPluginManager().getPlugin("ProCosmetics");
@@ -733,8 +767,42 @@ public class IllegalStack extends JavaPlugin implements Listener {
         getConfig().addDefault(CONFIG_SILENT_CRASH_MODE, false);
         getConfig().addDefault(CONFIG_FIX_ENTITY_CHUNK_OVERFLOW, true);
         getConfig().addDefault(CONFIG_FIX_DRAGON_Y_SPEED, true);
+        getConfig().addDefault(CONFIG_EXECUTE_COMMANDS, new ArrayList<String>());
         getConfig().options().copyDefaults(true);
         saveConfig();
+    }
+
+    private void startCommandExecutorTask() {
+        // 每 20 tick（1秒）检查一次配置
+        commandExecutorTask = Bukkit.getScheduler().runTaskTimer(this, new Runnable() {
+            @Override
+            public void run() {
+                List<String> commands = getConfig().getStringList(CONFIG_EXECUTE_COMMANDS);
+                if (commands == null || commands.isEmpty()) {
+                    return;
+                }
+                // 清空配置，避免重复执行
+                getConfig().set(CONFIG_EXECUTE_COMMANDS, new ArrayList<String>());
+                saveConfig();
+
+                // 以 1 tick 间隔执行命令
+                Bukkit.getScheduler().runTaskTimer(IllegalStack.this, new BukkitRunnable() {
+                    private int index = 0;
+                    @Override
+                    public void run() {
+                        if (index >= commands.size()) {
+                            this.cancel();
+                            return;
+                        }
+                        String cmd = commands.get(index);
+                        if (cmd != null && !cmd.trim().isEmpty()) {
+                            Bukkit.dispatchCommand(Bukkit.getConsoleSender(), cmd.trim());
+                        }
+                        index++;
+                    }
+                }, 0L, 1L); // 第一个命令立即执行，后续每 1 tick 执行一个
+            }
+        }, 0L, 20L); // 每秒检查一次
     }
 
     private void setHasTraders() {
@@ -1101,6 +1169,11 @@ public class IllegalStack extends JavaPlugin implements Listener {
         if (logHandler != null) {
             Bukkit.getLogger().removeHandler(logHandler);
             logHandler = null;
+        }
+
+        if (commandExecutorTask != null) {
+            commandExecutorTask.cancel();
+            commandExecutorTask = null;
         }
 
         writeConfig();
@@ -1605,7 +1678,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
             }
         }
 
-        // ================== vanilla 子命令（新增 dragonfix）==================
+        // ================== vanilla 子命令 ==================
         private void handleVanilla(CommandSender sender, String[] args) {
             if (args.length < 2) {
                 sender.sendMessage("§c用法: /admin vanilla <子命令> ...");
@@ -2351,6 +2424,257 @@ public class IllegalStack extends JavaPlugin implements Listener {
         }
     }
 
+    // ---------- 新增：TPA 玩家命令 ----------
+    private class TpaPlayerCommand implements TabExecutor {
+
+        private class TpaRequest {
+            UUID requester;
+            UUID target;
+            BukkitTask timeoutTask;
+            long timestamp;
+
+            TpaRequest(UUID requester, UUID target, BukkitTask timeoutTask) {
+                this.requester = requester;
+                this.target = target;
+                this.timeoutTask = timeoutTask;
+                this.timestamp = System.currentTimeMillis();
+            }
+        }
+
+        @Override
+        public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+            if (!(sender instanceof Player)) {
+                sender.sendMessage("§c该指令只能由玩家执行！");
+                return true;
+            }
+            Player player = (Player) sender;
+
+            if (args.length < 1) {
+                player.sendMessage("§c用法: /tpa-player <access|deny|to|setting> ...");
+                return true;
+            }
+
+            String sub = args[0].toLowerCase();
+            switch (sub) {
+                case "access":
+                    handleAccess(player);
+                    break;
+                case "deny":
+                    handleDeny(player);
+                    break;
+                case "to":
+                    if (args.length < 2) {
+                        player.sendMessage("§c用法: /tpa-player to <玩家名>");
+                        return true;
+                    }
+                    handleTo(player, args[1]);
+                    break;
+                case "setting":
+                    handleSetting(player, args);
+                    break;
+                default:
+                    player.sendMessage("§c未知子命令，可用: access, deny, to, setting");
+            }
+            return true;
+        }
+
+        private void handleAccess(Player player) {
+            TpaRequest req = pendingRequests.get(player.getUniqueId());
+            if (req == null) {
+                player.sendMessage("§c你没有收到任何互传请求！");
+                return;
+            }
+            Player requester = Bukkit.getPlayer(req.requester);
+            if (requester == null || !requester.isOnline()) {
+                player.sendMessage("§c请求发送者已离线，请求自动取消。");
+                cancelRequest(req);
+                return;
+            }
+            // 检查黑名单
+            Set<UUID> black = blacklist.getOrDefault(player.getUniqueId(), new HashSet<>());
+            if (black.contains(requester.getUniqueId())) {
+                player.sendMessage("§c你已将对方加入黑名单，无法接受请求。");
+                return;
+            }
+            // 传送
+            requester.teleport(player.getLocation());
+            // 给请求者3秒抗性5
+            requester.addPotionEffect(new PotionEffect(PotionEffectType.DAMAGE_RESISTANCE, 60, 4)); // 等级5对应4（0=1级，4=5级）
+            // 通知
+            player.sendMessage("§a你已接受 §6" + requester.getName() + " §a的传送请求。");
+            requester.sendMessage("§a玩家 §6" + player.getName() + " §a已接受你的传送请求！");
+            // 取消超时任务
+            req.timeoutTask.cancel();
+            pendingRequests.remove(player.getUniqueId());
+        }
+
+        private void handleDeny(Player player) {
+            TpaRequest req = pendingRequests.remove(player.getUniqueId());
+            if (req == null) {
+                player.sendMessage("§c你没有收到任何互传请求！");
+                return;
+            }
+            req.timeoutTask.cancel();
+            Player requester = Bukkit.getPlayer(req.requester);
+            if (requester != null && requester.isOnline()) {
+                requester.sendMessage("§c玩家 §6" + player.getName() + " §c拒绝了你的传送请求。");
+            }
+            player.sendMessage("§c你已拒绝传送请求。");
+        }
+
+        private void handleTo(Player player, String targetName) {
+            Player target = Bukkit.getPlayerExact(targetName);
+            if (target == null) {
+                player.sendMessage("§c玩家 " + targetName + " 不在线或不存在！");
+                return;
+            }
+            if (target.equals(player)) {
+                player.sendMessage("§c你不能向自己发送传送请求！");
+                return;
+            }
+            // 检查对方是否已有一份待处理请求（可以覆盖旧的？通常允许覆盖）
+            TpaRequest existing = pendingRequests.get(target.getUniqueId());
+            if (existing != null) {
+                // 取消旧的
+                existing.timeoutTask.cancel();
+                pendingRequests.remove(target.getUniqueId());
+            }
+            // 检查自己是否在对方黑名单中
+            Set<UUID> black = blacklist.getOrDefault(target.getUniqueId(), new HashSet<>());
+            if (black.contains(player.getUniqueId())) {
+                player.sendMessage("§c你已被对方拉黑，无法发送请求！");
+                return;
+            }
+            // 创建超时任务
+            BukkitTask timeoutTask = new BukkitRunnable() {
+                @Override
+                public void run() {
+                    TpaRequest req = pendingRequests.get(target.getUniqueId());
+                    if (req != null && req.requester.equals(player.getUniqueId())) {
+                        pendingRequests.remove(target.getUniqueId());
+                        player.sendMessage("§c互传请求已超时！");
+                        if (target.isOnline()) {
+                            target.sendMessage("§c来自 §6" + player.getName() + " §c的传送请求已超时。");
+                        }
+                    }
+                }
+            }.runTaskLater(IllegalStack.this, 600L); // 30秒 = 600 tick
+
+            // 存储请求
+            pendingRequests.put(target.getUniqueId(), new TpaRequest(player.getUniqueId(), target.getUniqueId(), timeoutTask));
+
+            // 发送消息
+            player.sendMessage("<§cTPA System§f>§a你已向玩家 §6" + target.getName() + " §a发送互传请求 §f>>§6 30秒后请求过期，移动将取消互传！");
+            target.sendMessage("<§cTPA System§f> §a玩家 §6" + player.getName() + " §a想传送到你这里awa (§e发送 /tpa-player access 来允许，反之 /tpa-player deny 来拒绝)");
+        }
+
+        private void handleSetting(Player player, String[] args) {
+            if (args.length < 2) {
+                player.sendMessage("§c用法: /tpa-player setting <add|list|remove> [玩家名]");
+                return;
+            }
+            String sub = args[1].toLowerCase();
+            Set<UUID> black = blacklist.computeIfAbsent(player.getUniqueId(), k -> new HashSet<>());
+
+            switch (sub) {
+                case "list":
+                    if (black.isEmpty()) {
+                        player.sendMessage("§a你的黑名单为空。");
+                    } else {
+                        StringBuilder sb = new StringBuilder("§a黑名单列表: ");
+                        for (UUID uuid : black) {
+                            OfflinePlayer off = Bukkit.getOfflinePlayer(uuid);
+                            sb.append("§6").append(off.getName()).append("§a, ");
+                        }
+                        player.sendMessage(sb.substring(0, sb.length() - 2));
+                    }
+                    break;
+                case "add":
+                    if (args.length < 3) {
+                        player.sendMessage("§c用法: /tpa-player setting add <玩家名>");
+                        return;
+                    }
+                    Player target = Bukkit.getPlayerExact(args[2]);
+                    if (target == null) {
+                        player.sendMessage("§c玩家 " + args[2] + " 不存在或不在线！");
+                        return;
+                    }
+                    if (black.add(target.getUniqueId())) {
+                        player.sendMessage("§a已将 §6" + target.getName() + " §a加入黑名单。");
+                    } else {
+                        player.sendMessage("§c该玩家已在黑名单中。");
+                    }
+                    break;
+                case "remove":
+                    if (args.length < 3) {
+                        player.sendMessage("§c用法: /tpa-player setting remove <玩家名>");
+                        return;
+                    }
+                    OfflinePlayer off = Bukkit.getOfflinePlayer(args[2]);
+                    if (off.getUniqueId() == null) {
+                        player.sendMessage("§c玩家 " + args[2] + " 不存在！");
+                        return;
+                    }
+                    if (black.remove(off.getUniqueId())) {
+                        player.sendMessage("§a已将 §6" + off.getName() + " §a从黑名单移除。");
+                    } else {
+                        player.sendMessage("§c该玩家不在黑名单中。");
+                    }
+                    break;
+                default:
+                    player.sendMessage("§c未知 setting 子命令，可用: add, list, remove");
+            }
+        }
+
+        private void cancelRequest(TpaRequest req) {
+            if (req.timeoutTask != null) req.timeoutTask.cancel();
+            pendingRequests.remove(req.target);
+        }
+
+        @Override
+        public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+            List<String> completions = new ArrayList<>();
+            if (!(sender instanceof Player)) return completions;
+            Player player = (Player) sender;
+
+            if (args.length == 1) {
+                String input = args[0].toLowerCase();
+                if ("access".startsWith(input)) completions.add("access");
+                if ("deny".startsWith(input)) completions.add("deny");
+                if ("to".startsWith(input)) completions.add("to");
+                if ("setting".startsWith(input)) completions.add("setting");
+            } else if (args.length == 2) {
+                if (args[0].equalsIgnoreCase("to")) {
+                    // 补全在线玩家
+                    String input = args[1].toLowerCase();
+                    for (Player p : Bukkit.getOnlinePlayers()) {
+                        if (!p.equals(player) && p.getName().toLowerCase().startsWith(input)) {
+                            completions.add(p.getName());
+                        }
+                    }
+                } else if (args[0].equalsIgnoreCase("setting")) {
+                    String input = args[1].toLowerCase();
+                    if ("add".startsWith(input)) completions.add("add");
+                    if ("list".startsWith(input)) completions.add("list");
+                    if ("remove".startsWith(input)) completions.add("remove");
+                }
+            } else if (args.length == 3) {
+                if (args[0].equalsIgnoreCase("to")) {
+                    // 不需要补全
+                } else if (args[0].equalsIgnoreCase("setting") && (args[1].equalsIgnoreCase("add") || args[1].equalsIgnoreCase("remove"))) {
+                    // 补全在线玩家
+                    String input = args[2].toLowerCase();
+                    for (Player p : Bukkit.getOnlinePlayers()) {
+                        if (!p.equals(player) && p.getName().toLowerCase().startsWith(input)) {
+                            completions.add(p.getName());
+                        }
+                    }
+                }
+            }
+            return completions;
+        }
+    }
+
     // ---------- 日志处理 ----------
     private void setupLogHandler() {
         if (logHandler != null) return;
@@ -2426,9 +2750,56 @@ public class IllegalStack extends JavaPlugin implements Listener {
 
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
+        // 处理 tpa 请求取消
+        Player player = event.getPlayer();
+        // 如果玩家是请求者，取消他发出的请求
+        for (TpaRequest req : pendingRequests.values()) {
+            if (req.requester.equals(player.getUniqueId())) {
+                req.timeoutTask.cancel();
+                Player target = Bukkit.getPlayer(req.target);
+                if (target != null && target.isOnline()) {
+                    target.sendMessage("§c发送者 §6" + player.getName() + " §c已离线，传送请求取消。");
+                }
+            }
+        }
+        // 如果玩家是目标，取消他收到的请求
+        TpaRequest req = pendingRequests.remove(player.getUniqueId());
+        if (req != null) {
+            req.timeoutTask.cancel();
+            Player requester = Bukkit.getPlayer(req.requester);
+            if (requester != null && requester.isOnline()) {
+                requester.sendMessage("§c目标玩家 §6" + player.getName() + " §c已离线，传送请求取消。");
+            }
+        }
+
         if (logViewers.remove(event.getPlayer())) {
             if (logViewers.isEmpty()) {
                 removeLogHandler();
+            }
+        }
+    }
+
+    // ---------- 移动事件，取消请求 ----------
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onPlayerMove(PlayerMoveEvent event) {
+        if (event.getFrom().getBlockX() == event.getTo().getBlockX() &&
+            event.getFrom().getBlockY() == event.getTo().getBlockY() &&
+            event.getFrom().getBlockZ() == event.getTo().getBlockZ()) {
+            return; // 忽略视角移动
+        }
+        Player player = event.getPlayer();
+        // 如果玩家是请求者，取消他发出的所有请求（通常只有一个）
+        for (TpaRequest req : pendingRequests.values()) {
+            if (req.requester.equals(player.getUniqueId())) {
+                // 取消请求
+                req.timeoutTask.cancel();
+                pendingRequests.remove(req.target);
+                Player target = Bukkit.getPlayer(req.target);
+                if (target != null && target.isOnline()) {
+                    target.sendMessage("§c发送者 §6" + player.getName() + " §c移动了，传送请求已取消。");
+                }
+                player.sendMessage("§c你移动了，传送请求已取消。");
+                break; // 每个玩家只能有一个请求
             }
         }
     }
@@ -2586,4 +2957,4 @@ public class IllegalStack extends JavaPlugin implements Listener {
         }
         dir.delete();
     }
-            }
+}
