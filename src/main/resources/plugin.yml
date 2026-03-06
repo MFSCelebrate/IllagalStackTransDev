@@ -1,6 +1,6 @@
 main: main.java.me.dniym.IllegalStack
 name: IllegalStackTrans
-version: "2.9.16a ExtraVer_CN"
+version: "3.0.00 Preview ExtraVer (Jre21)"
 api-version: 1.21
 folia-supported: true
 description: 修复了一些仍然存在于 Minecraft原版 的特性。插件原作者dNiym和Loving11ish，本插件是对 IllagalStack 插件的扩展和中文翻译
@@ -39,6 +39,7 @@ permissions:
   illegalstack.serverchat:
     description: 此权限已弃用，原功能已合并至 /admin chat。
     default: op
+
 
 
 
