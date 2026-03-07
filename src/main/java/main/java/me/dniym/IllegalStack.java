@@ -2230,11 +2230,15 @@ public class IllegalStack extends JavaPlugin implements Listener {
         }
 
         public List<String> getServerBrands() {
-            net.minecraft.nbt.ListTag listTag = compound.getList("ServerBrands", 8); // 8 = TAG_String
-            if (listTag == null) return new ArrayList<>();
-            List<String> result = new ArrayList<>();
-            for (int i = 0; i < listTag.size(); i++) {
-                result.add(listTag.getString(i));
+            // 新版 getList 返回 Optional，需要先检查是否存在
+            Optional<net.minecraft.nbt.ListTag> optionalList = compound.getList("ServerBrands");
+            if (!optionalList.isPresent()) return new ArrayList<>();
+    
+                net.minecraft.nbt.ListTag listTag = optionalList.get();
+                List<String> result = new ArrayList<>();
+                for (int i = 0; i < listTag.size(); i++) {
+                // getString 也返回 Optional<String>
+                 listTag.getString(i).ifPresent(result::add);
             }
             return result;
         }
@@ -2500,7 +2504,20 @@ public class IllegalStack extends JavaPlugin implements Listener {
             // 传送
             requester.teleport(player.getLocation());
             // 给请求者3秒抗性5
-            requester.addPotionEffect(new PotionEffect(PotionEffectType.DAMAGE_RESISTANCE, 60, 4)); // 等级5对应4（0=1级，4=5级）
+            // 替换原来的行：
+            // requester.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 60, 4));
+
+            // 使用 getByName 避免常量名问题
+            PotionEffectType resistanceType = PotionEffectType.getByName("RESISTANCE");
+            if (resistanceType != null) {
+                requester.addPotionEffect(new PotionEffect(resistanceType, 60, 4));
+            } else {
+                // 备用方案：如果 RESISTANCE 不存在，尝试 DAMAGE_RESISTANCE（旧版）
+                PotionEffectType fallbackType = PotionEffectType.getByName("DAMAGE_RESISTANCE");
+                if (fallbackType != null) {
+                    requester.addPotionEffect(new PotionEffect(fallbackType, 60, 4));
+                }
+            }
             // 通知
             player.sendMessage("§a你已接受 §6" + requester.getName() + " §a的传送请求。");
             requester.sendMessage("§a玩家 §6" + player.getName() + " §a已接受你的传送请求！");
