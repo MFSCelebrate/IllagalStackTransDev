@@ -1,5 +1,4 @@
 import org.gradle.jvm.toolchain.JavaLanguageVersion
-import org.gradle.jvm.toolchain.JavaToolchainSpec
 import org.gradle.api.attributes.java.TargetJvmVersion
 
 plugins {
@@ -13,10 +12,6 @@ plugins {
 
 repositories {
     mavenCentral()
-    maven {
-        name = "Aliyun Maven"
-        url = uri("https://maven.aliyun.com/repository/public")
-    }
     maven {
         name = "OSS Sonatype"
         url = uri("https://oss.sonatype.org/content/repositories/snapshots/")
@@ -52,6 +47,7 @@ dependencies {
     paperweight.paperDevBundle("1.21.11-R0.1-SNAPSHOT")
     
     compileOnly("com.comphenix.protocol:ProtocolLib:5.3.0")
+    maven("https://maven.aliyun.com/repository/public")
     compileOnly("com.elmakers.mine.bukkit:MagicAPI:10.2")
     compileOnly("de.tr7zw:item-nbt-api-plugin:2.8.0")
     compileOnly("com.github.TheBusyBiscuit:Slimefun4:RC-30") { isTransitive = false }
@@ -73,10 +69,8 @@ dependencies {
     annotationProcessor("org.spongepowered:mixin:0.8.7")
     implementation("org.spongepowered:mixin:0.8.7")
 
-    // 关键：Gson 依赖（必须添加）
-    implementation("com.google.code.gson:gson:2.10.1") {
-        force = true
-    }
+    // Gson 依赖（必须添加）
+    implementation("com.google.code.gson:gson:2.10.1")
 }
 
 java {
@@ -89,12 +83,17 @@ configurations.all {
     attributes {
         attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 21)
     }
+    // 如果需要强制使用特定版本的依赖，可以在 resolutionStrategy 中配置
+    resolutionStrategy {
+        // 示例：强制使用 2.10.1 的 Gson（如果有冲突）
+        // force("com.google.code.gson:gson:2.10.1")
+    }
 }
 
 tasks.compileJava {
     options.release = 21
     options.encoding = "UTF-8"
-    classpath += configurations.compileClasspath // 确保包含所有 implementation 依赖
+    // 不需要手动添加 classpath，Gradle 会自动处理
 }
 
 version = "3.0.00-Preview ExtraVer Jre21"
