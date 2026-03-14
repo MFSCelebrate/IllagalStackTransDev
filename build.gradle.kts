@@ -8,7 +8,7 @@ plugins {
     idea
     eclipse
     id("io.papermc.paperweight.userdev") version "2.0.0-beta.18"
-    id("com.github.johnrengelman.shadow") version "8.1.1" // 新增：用于打包 Mixin 库
+    id("com.github.johnrengelman.shadow") version "8.1.1" // 用于打包 Mixin 库
 }
 
 repositories {
@@ -37,7 +37,7 @@ repositories {
         name = "JitPack"
         url = uri("https://jitpack.io")
     }
-    maven { // 新增：Mixin 仓库
+    maven { // Mixin 仓库
         name = "SpongePowered"
         url = uri("https://repo.spongepowered.org/maven/")
     }
@@ -58,9 +58,18 @@ dependencies {
                 "The minecraft server ships netty as well, so we don't need to include it in the jar.")
     }
     compileOnly("com.gmail.nossr50.mcMMO:mcMMO:2.1.217") { isTransitive = false }
-    compileOnly("fr.minuskube.inv:smart-invs:1.2.7")
+    
+    // ---------- 排除 smart-invs 传递依赖的 spigot-api，避免与 Paper API 冲突 ----------
+    compileOnly("fr.minuskube.inv:smart-invs:1.2.7") {
+        exclude(group = "org.spigotmc", module = "spigot-api")
+    }
+    
     // compileOnly("com.github.CraftingStore.MinecraftPlugin:core:master-e366d322f8-1")
-    compileOnly("com.github.brcdev-minecraft:shopgui-api:3.0.0")
+    
+    // ---------- 排除 shopgui-api 传递依赖的 spigot-api，避免冲突 ----------
+    compileOnly("com.github.brcdev-minecraft:shopgui-api:3.0.0") {
+        exclude(group = "org.spigotmc", module = "spigot-api")
+    }
 
     // ---------- Mixin 相关依赖 ----------
     compileOnly("org.spongepowered:mixin:0.8.7")          // Mixin API（编译时）
@@ -97,7 +106,7 @@ tasks.processResources {
 tasks.shadowJar {
     archiveClassifier.set("") // 替换默认的 jar（无 classifier）
     // 将 Mixin 库重新打包到你的包名下，避免与其他插件冲突
-    relocate("org.spongepowered.asm", "main.java.me.dniym.mixin.asm") // 请替换为你的实际包名
+    relocate("org.spongepowered.asm", "main.java.me.dniym.mixin.asm")
 }
 
 tasks.assemble {
