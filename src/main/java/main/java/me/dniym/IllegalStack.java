@@ -3,7 +3,7 @@ package main.java.me.dniym;
 import main.java.me.dniym.commands.IllegalStackCommand;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParseException
+import com.google.gson.JsonParseException;
 // 注意：JsonParseException 是 Gson 解析异常类，如果你没有直接使用它，可以不导入。
 // 但如果你使用了，请确保导入：import com.google.gson.JsonParseException;
 import main.java.me.dniym.enums.Msg;
