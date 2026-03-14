@@ -14,6 +14,10 @@ plugins {
 repositories {
     mavenCentral()
     maven {
+        name = "Aliyun Maven"
+        url = uri("https://maven.aliyun.com/repository/public")
+    }
+    maven {
         name = "OSS Sonatype"
         url = uri("https://oss.sonatype.org/content/repositories/snapshots/")
     }
