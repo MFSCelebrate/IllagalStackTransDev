@@ -106,6 +106,9 @@ import java.util.HashSet;
 import java.util.UUID;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.scheduler.BukkitRunnable;
+
+// ---------- 新增导入（用于 Mixin）----------
+import org.spongepowered.asm.mixin.Mixins;
 // -------------------------------------------------
 
 public class IllegalStack extends JavaPlugin implements Listener {
@@ -525,6 +528,18 @@ public class IllegalStack extends JavaPlugin implements Listener {
 
     public static boolean hasStorage() {
         return hasStorage;
+    }
+
+    @Override
+    public void onLoad() {
+        // 在插件加载时尝试加载 Mixin 配置
+        try {
+            Mixins.addConfiguration("mixins.json");
+            getLogger().info("Mixin 配置加载成功。");
+        } catch (Throwable t) {
+            // 如果 Mixin 库不存在或配置加载失败，仅记录警告，不影响插件其他功能
+            getLogger().warning("Mixin 配置加载失败，请确保 Mixin 库已正确安装。错误: " + t.getMessage());
+        }
     }
 
     @Override
@@ -2943,7 +2958,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
             }
         }
     }
-
+ 
     private void createPackMeta(File packFolder) {
         File mcmeta = new File(packFolder, "pack.mcmeta");
         String content = "{\n" +
@@ -2972,4 +2987,4 @@ public class IllegalStack extends JavaPlugin implements Listener {
         }
         dir.delete();
     }
-}
+    }
