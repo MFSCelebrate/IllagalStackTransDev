@@ -7,7 +7,8 @@ plugins {
     `java-library`
     idea
     eclipse
-    id("io.papermc.paperweight.userdev") version "2.0.0-beta.14"
+    id("io.papermc.paperweight.userdev") version "2.0.0-beta.18"
+    id("com.github.johnrengelman.shadow") version "8.1.1" // 新增：用于打包 Mixin 库
 }
 
 repositories {
@@ -36,13 +37,17 @@ repositories {
         name = "JitPack"
         url = uri("https://jitpack.io")
     }
+    maven { // 新增：Mixin 仓库
+        name = "SpongePowered"
+        url = uri("https://repo.spongepowered.org/maven/")
+    }
 }
 
 dependencies {
     compileOnly("dev.folia:folia-api:1.20.4-R0.1-SNAPSHOT")
     
     // Paperweight dev bundle – 自动引入 paper-api 和映射好的 NMS
-    paperweight.paperDevBundle("1.21-R0.1-SNAPSHOT")
+    paperweight.paperDevBundle("1.21.11-R0.1-SNAPSHOT")
     
     compileOnly("com.comphenix.protocol:ProtocolLib:5.3.0")
     compileOnly("com.elmakers.mine.bukkit:MagicAPI:10.2")
@@ -56,6 +61,11 @@ dependencies {
     compileOnly("fr.minuskube.inv:smart-invs:1.2.7")
     // compileOnly("com.github.CraftingStore.MinecraftPlugin:core:master-e366d322f8-1")
     compileOnly("com.github.brcdev-minecraft:shopgui-api:3.0.0")
+
+    // ---------- Mixin 相关依赖 ----------
+    compileOnly("org.spongepowered:mixin:0.8.7")          // Mixin API（编译时）
+    annotationProcessor("org.spongepowered:mixin:0.8.7") // 注解处理器
+    implementation("org.spongepowered:mixin:0.8.7")       // Mixin 运行时（将被打包进 JAR）
 }
 
 java {
@@ -83,6 +93,13 @@ tasks.processResources {
     }
 }
 
+// 配置 Shadow 打包
+tasks.shadowJar {
+    archiveClassifier.set("") // 替换默认的 jar（无 classifier）
+    // 将 Mixin 库重新打包到你的包名下，避免与其他插件冲突
+    relocate("org.spongepowered.asm", "main.java.me.dniym.mixin.asm") // 请替换为你的实际包名
+}
+
 tasks.assemble {
-    dependsOn(tasks.reobfJar)
+    dependsOn(tasks.reobfJar, tasks.shadowJar) // 同时生成 reobf 和 shadow JAR
 }
