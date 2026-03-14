@@ -64,9 +64,9 @@ dependencies {
     }
 
     // Mixin 相关依赖
-    compileOnly("org.spongepowered:mixin:0.8.7")
-    annotationProcessor("org.spongepowered:mixin:0.8.7")
-    implementation("org.spongepowered:mixin:0.8.7")
+   // compileOnly("org.spongepowered:mixin:0.8.7")
+    //annotationProcessor("org.spongepowered:mixin:0.8.7")
+    //implementation("org.spongepowered:mixin:0.8.7")
 
     // 强制使用 implementation 确保 Gson 被正确添加到编译类路径
     implementation("com.google.code.gson:gson:2.10.1")
@@ -91,6 +91,9 @@ configurations.all {
 tasks.compileJava {
     options.release = 21
     options.encoding = "UTF-8"
+    doFirst {
+        println("Compile classpath: ${classpath.files.joinToString("\n")}")
+    }
 }
 
 version = "3.0.00-Preview ExtraVer Jre21"
