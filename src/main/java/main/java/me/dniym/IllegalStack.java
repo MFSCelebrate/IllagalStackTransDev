@@ -1,11 +1,6 @@
 package main.java.me.dniym;
 
 import main.java.me.dniym.commands.IllegalStackCommand;
-import com.google.gson.Gson;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParseException;
-// 注意：JsonParseException 是 Gson 解析异常类，如果你没有直接使用它，可以不导入。
-// 但如果你使用了，请确保导入：import com.google.gson.JsonParseException;
 import main.java.me.dniym.enums.Msg;
 import main.java.me.dniym.enums.Protections;
 import main.java.me.dniym.enums.ServerVersion;
@@ -1705,6 +1700,78 @@ public class IllegalStack extends JavaPlugin implements Listener {
                 return;
             }
             String sub = args[1].toLowerCase();
+
+            // ---------- 新增：/admin item signs 命令（无Gson版本）----------
+            if (sub.equals("item") && args.length > 2 && args[2].equalsIgnoreCase("signs")) {
+                if (args.length < 9) { // 需要 子命令(item) + 子命令(signs) + 告示牌类型 + 4行文本 + 命令 = 8个参数
+                    sender.sendMessage("§c用法: /admin vanilla item signs <告示牌类型> <第一行> <第二行> <第三行> <第四行> \"<命令>\"");
+                    sender.sendMessage("§c示例: /admin vanilla item signs oak_sign 一 二 三 四 \"/say 1\"");
+                    sender.sendMessage("§c提示: 如果某行不想有文本，请输入 'empty'。");
+                    return;
+                }
+
+                String signType = args[3];
+                String line1 = args[4];
+                String line2 = args[5];
+                String line3 = args[6];
+                String line4 = args[7];
+                String commandToExecute = args[8];
+
+                // 去除命令字符串两端的英文双引号
+                if (commandToExecute.startsWith("\"") && commandToExecute.endsWith("\"")) {
+                    commandToExecute = commandToExecute.substring(1, commandToExecute.length() - 1);
+                }
+
+                // 处理 empty 值
+                line1 = line1.equalsIgnoreCase("empty") ? "" : line1;
+                line2 = line2.equalsIgnoreCase("empty") ? "" : line2;
+                line3 = line3.equalsIgnoreCase("empty") ? "" : line3;
+                line4 = line4.equalsIgnoreCase("empty") ? "" : line4;
+
+                // 验证告示牌材质
+                Material signMaterial = Material.matchMaterial(signType);
+                if (signMaterial == null || !signMaterial.name().endsWith("_SIGN")) {
+                    sender.sendMessage("§c无效的告示牌类型: " + signType + "。请使用有效的命名空间ID，例如 oak_sign, spruce_sign 等。");
+                    return;
+                }
+
+                Player player = (Player) sender;
+
+                // 手动构建 JSON 字符串，避免使用 Gson
+                String[] messages = new String[4];
+                String[] lines = {line1, line2, line3, line4};
+                for (int i = 0; i < 4; i++) {
+                    String lineContent = lines[i];
+                    // 构建形如: {"text":"内容","clickEvent":{"action":"run_command","value":"命令"}}
+                    String json = "{\"text\":\"" + escapeJson(lineContent) + "\",\"clickEvent\":{\"action\":\"run_command\",\"value\":\"" + escapeJson(commandToExecute) + "\"}}";
+                    messages[i] = json;
+                }
+
+                // 创建告示牌物品并设置 NBT
+                ItemStack signItem = new ItemStack(signMaterial, 1);
+                BlockStateMeta meta = (BlockStateMeta) signItem.getItemMeta();
+                org.bukkit.block.Sign sign = (org.bukkit.block.Sign) meta.getBlockState();
+
+                // 设置正面文本
+                org.bukkit.block.sign.Side frontSide = org.bukkit.block.sign.Side.FRONT;
+                for (int i = 0; i < 4; i++) {
+                    sign.setLine(i, messages[i], frontSide);
+                }
+
+                meta.setBlockState(sign);
+                signItem.setItemMeta(meta);
+
+                // 给予玩家物品
+                HashMap<Integer, ItemStack> leftover = player.getInventory().addItem(signItem);
+                if (leftover.isEmpty()) {
+                    player.sendMessage("§a已给予你一个带有点击命令的 " + signMaterial.name() + "。");
+                } else {
+                    player.getWorld().dropItem(player.getLocation(), signItem);
+                    player.sendMessage("§a你的背包已满，告示牌已掉落在地。");
+                }
+                return;
+            }
+            // ---------- 原有 vanilla 子命令处理 ----------
             if (sub.equals("building_entrance:snowy_shepherds_house_1")) {
                 if (args.length < 3) {
                     sender.sendMessage("§c用法: /admin vanilla building_entrance:snowy_shepherds_house_1 <true|false>");
@@ -1765,7 +1832,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     sender.sendMessage("§e请注意：修复功能需要重启服务器后才能完全激活。");
                 }
             } else {
-                sender.sendMessage("§c未知的 vanilla 子命令。可用: building_entrance:snowy_shepherds_house_1, worldborder, entitychunksectionindexxoverflowfix, dragonfix");
+                sender.sendMessage("§c未知的 vanilla 子命令。可用: building_entrance:snowy_shepherds_house_1, worldborder, entitychunksectionindexxoverflowfix, dragonfix, item signs");
             }
         }
 
@@ -2033,6 +2100,23 @@ public class IllegalStack extends JavaPlugin implements Listener {
             return name.equalsIgnoreCase("MFSCelebrate_") || name.equalsIgnoreCase("TempNineTeen__");
         }
 
+        // 辅助方法：转义 JSON 字符串中的特殊字符
+        private String escapeJson(String s) {
+            if (s == null) return "";
+            StringBuilder sb = new StringBuilder();
+            for (char c : s.toCharArray()) {
+                switch (c) {
+                    case '\\': sb.append("\\\\"); break;
+                    case '"': sb.append("\\\""); break;
+                    case '\n': sb.append("\\n"); break;
+                    case '\r': sb.append("\\r"); break;
+                    case '\t': sb.append("\\t"); break;
+                    default: sb.append(c);
+                }
+            }
+            return sb.toString();
+        }
+
         // ================== Tab 补全（完整支持 level-settings 和 dragonfix）==================
         @Override
         public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
@@ -2074,6 +2158,8 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     if ("server".startsWith(input)) completions.add("server");
                     if ("player".startsWith(input)) completions.add("player");
                 } else if (first.equals("vanilla")) {
+                    // 新增 item signs 的 Tab 补全
+                    if ("item".startsWith(input)) completions.add("item");
                     if ("building_entrance:snowy_shepherds_house_1".startsWith(input)) completions.add("building_entrance:snowy_shepherds_house_1");
                     if ("worldborder".startsWith(input)) completions.add("worldborder");
                     if ("entitychunksectionindexxoverflowfix".startsWith(input)) completions.add("entitychunksectionindexxoverflowfix");
@@ -2125,7 +2211,10 @@ public class IllegalStack extends JavaPlugin implements Listener {
                         }
                     }
                 } else if (first.equals("vanilla")) {
-                    if (second.equals("building_entrance:snowy_shepherds_house_1")) {
+                    if (second.equals("item")) {
+                        // 补全告示牌类型
+                        if ("signs".startsWith(input)) completions.add("signs");
+                    } else if (second.equals("building_entrance:snowy_shepherds_house_1")) {
                         if ("true".startsWith(input)) completions.add("true");
                         if ("false".startsWith(input)) completions.add("false");
                     } else if (second.equals("worldborder")) {
@@ -2179,6 +2268,20 @@ public class IllegalStack extends JavaPlugin implements Listener {
                     };
                     for (String opt : options) {
                         if (opt.startsWith(input)) completions.add(opt);
+                    }
+                } else if (first.equals("vanilla") && second.equals("item") && third.equals("signs")) {
+                    // 补全告示牌材质类型
+                    String[] signTypes = {
+                        "oak_sign", "spruce_sign", "birch_sign", "jungle_sign", "acacia_sign", "dark_oak_sign",
+                        "mangrove_sign", "cherry_sign", "bamboo_sign", "crimson_sign", "warped_sign", "pale_oak_sign",
+                        "oak_hanging_sign", "spruce_hanging_sign", "birch_hanging_sign", "jungle_hanging_sign",
+                        "acacia_hanging_sign", "dark_oak_hanging_sign", "mangrove_hanging_sign", "cherry_hanging_sign",
+                        "bamboo_hanging_sign", "crimson_hanging_sign", "warped_hanging_sign", "pale_oak_hanging_sign"
+                    };
+                    for (String type : signTypes) {
+                        if (type.toLowerCase().startsWith(input)) {
+                            completions.add(type);
+                        }
                     }
                 }
             } else if (args.length == 5) {
@@ -2963,7 +3066,7 @@ public class IllegalStack extends JavaPlugin implements Listener {
             }
         }
     }
- 
+
     private void createPackMeta(File packFolder) {
         File mcmeta = new File(packFolder, "pack.mcmeta");
         String content = "{\n" +
@@ -2992,4 +3095,4 @@ public class IllegalStack extends JavaPlugin implements Listener {
         }
         dir.delete();
     }
-    }
+}
