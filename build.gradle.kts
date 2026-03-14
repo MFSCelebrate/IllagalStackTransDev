@@ -74,7 +74,9 @@ dependencies {
     implementation("org.spongepowered:mixin:0.8.7")
 
     // 关键：Gson 依赖（必须添加）
-    implementation("com.google.code.gson:gson:2.10.1")
+    implementation("com.google.code.gson:gson:2.10.1") {
+        force = true
+    }
 }
 
 java {
@@ -92,6 +94,7 @@ configurations.all {
 tasks.compileJava {
     options.release = 21
     options.encoding = "UTF-8"
+    classpath += configurations.compileClasspath // 确保包含所有 implementation 依赖
 }
 
 version = "3.0.00-Preview ExtraVer Jre21"
