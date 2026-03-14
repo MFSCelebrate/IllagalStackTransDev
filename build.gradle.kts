@@ -52,6 +52,7 @@ dependencies {
     compileOnly("com.comphenix.protocol:ProtocolLib:5.3.0")
     compileOnly("com.elmakers.mine.bukkit:MagicAPI:10.2")
     compileOnly("de.tr7zw:item-nbt-api-plugin:2.8.0")
+    implementation("com.google.code.gson:gson:2.10.1")
     compileOnly("com.github.TheBusyBiscuit:Slimefun4:RC-30") { isTransitive = false }
     compileOnly("io.netty:netty-all:4.1.110.Final") {
         because("The version aligns with the version used by Minecraft itself. " +
