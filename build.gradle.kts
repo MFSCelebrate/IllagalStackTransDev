@@ -1,4 +1,5 @@
 import org.gradle.jvm.toolchain.JavaLanguageVersion
+import org.gradle.jvm.toolchain.JavaToolchainSpec
 import org.gradle.api.attributes.java.TargetJvmVersion
 
 plugins {
@@ -12,10 +13,6 @@ plugins {
 
 repositories {
     mavenCentral()
-    maven {
-    name = "Aliyun Maven"
-    url = uri("https://maven.aliyun.com/repository/public")
-}
     maven {
         name = "OSS Sonatype"
         url = uri("https://oss.sonatype.org/content/repositories/snapshots/")
@@ -48,10 +45,11 @@ repositories {
 
 dependencies {
     compileOnly("dev.folia:folia-api:1.20.4-R0.1-SNAPSHOT")
+    
+    // Paperweight dev bundle – 自动引入 paper-api 和映射好的 NMS
     paperweight.paperDevBundle("1.21.11-R0.1-SNAPSHOT")
     
     compileOnly("com.comphenix.protocol:ProtocolLib:5.3.0")
-    
     compileOnly("com.elmakers.mine.bukkit:MagicAPI:10.2")
     compileOnly("de.tr7zw:item-nbt-api-plugin:2.8.0")
     compileOnly("com.github.TheBusyBiscuit:Slimefun4:RC-30") { isTransitive = false }
@@ -61,19 +59,22 @@ dependencies {
     }
     compileOnly("com.gmail.nossr50.mcMMO:mcMMO:2.1.217") { isTransitive = false }
     
+    // ---------- 排除 smart-invs 传递依赖的 spigot-api，避免与 Paper API 冲突 ----------
     compileOnly("fr.minuskube.inv:smart-invs:1.2.7") {
         exclude(group = "org.spigotmc", module = "spigot-api")
     }
+    
+    // compileOnly("com.github.CraftingStore.MinecraftPlugin:core:master-e366d322f8-1")
+    
+    // ---------- 排除 shopgui-api 传递依赖的 spigot-api，避免冲突 ----------
     compileOnly("com.github.brcdev-minecraft:shopgui-api:3.0.0") {
         exclude(group = "org.spigotmc", module = "spigot-api")
     }
 
-    // Mixin 相关依赖
-    compileOnly("org.spongepowered:mixin:0.8.7")
-    annotationProcessor("org.spongepowered:mixin:0.8.7")
-    implementation("org.spongepowered:mixin:0.8.7")
-
-    
+    // ---------- Mixin 相关依赖 ----------
+    compileOnly("org.spongepowered:mixin:0.8.7")          // Mixin API（编译时）
+    annotationProcessor("org.spongepowered:mixin:0.8.7") // 注解处理器
+    implementation("org.spongepowered:mixin:0.8.7")       // Mixin 运行时（将被打包进 JAR）
 }
 
 java {
@@ -91,7 +92,6 @@ configurations.all {
 tasks.compileJava {
     options.release = 21
     options.encoding = "UTF-8"
-    // 不需要手动添加 classpath，Gradle 会自动处理
 }
 
 version = "3.0.00-Preview ExtraVer Jre21"
