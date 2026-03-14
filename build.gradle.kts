@@ -73,8 +73,7 @@ dependencies {
     annotationProcessor("org.spongepowered:mixin:0.8.7")
     implementation("org.spongepowered:mixin:0.8.7")
 
-    // Gson 依赖（必须添加）
-    implementation("com.google.code.gson:gson:2.8.9")
+    
 }
 
 java {
@@ -86,11 +85,6 @@ java {
 configurations.all {
     attributes {
         attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 21)
-    }
-    // 如果需要强制使用特定版本的依赖，可以在 resolutionStrategy 中配置
-    resolutionStrategy {
-        // 示例：强制使用 2.10.1 的 Gson（如果有冲突）
-        // force("com.google.code.gson:gson:2.10.1")
     }
 }
 
