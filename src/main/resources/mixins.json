@@ -1,7 +1,7 @@
 {
   "required": true,
   "minVersion": "0.8",
-  "package": "main.java.me.dniym.mixins",  // 替换为你的 Mixin 包路径
+  "package": "main.java.me.dniym.mixins",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
     "GenerationChunkHolderMixin"
