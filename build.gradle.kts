@@ -74,7 +74,7 @@ dependencies {
     implementation("org.spongepowered:mixin:0.8.7")
 
     // Gson 依赖（必须添加）
-    implementation("com.google.code.gson:gson:2.10.1")
+    implementation("com.google.code.gson:gson:2.8.9")
 }
 
 java {
