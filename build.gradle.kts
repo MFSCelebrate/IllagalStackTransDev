@@ -63,10 +63,9 @@ dependencies {
         exclude(group = "org.spigotmc", module = "spigot-api")
     }
 
-    // Mixin 相关依赖
+    // Mixin 相关依赖（编译时使用，运行时由 Ignite 提供）
     compileOnly("org.spongepowered:mixin:0.8.7")
     annotationProcessor("org.spongepowered:mixin:0.8.7")
-    implementation("org.spongepowered:mixin:0.8.7")
 
     // Gson 依赖（同时用于编译和注解处理）
     implementation("com.google.code.gson:gson:2.10.1")
@@ -117,7 +116,7 @@ tasks.shadowJar {
     // 我们不再显式声明依赖，而是依靠 Paperweight 插件自身的逻辑确保 reobfJar 在 shadowJar 之前运行。
     // 如果 Paperweight 的设计导致 reobfJar 和 assemble/build 有循环依赖，我们主动切断它。
     archiveClassifier.set("")
-    relocate("org.spongepowered.asm", "main.java.me.dniym.mixin.asm")
+    
 }
 
 // 重要：我们不再让 assemble 或 build 任务依赖 shadowJar。
