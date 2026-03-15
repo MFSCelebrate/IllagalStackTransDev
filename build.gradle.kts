@@ -103,7 +103,7 @@ tasks.compileJava {
     }
 }
 
-version = "3.0.00-Preview ExtraVer Jre21"
+version = "3.1.0-IllagalStackTrans"
 
 tasks.processResources {
     filesMatching("plugin.yml") {
@@ -111,13 +111,12 @@ tasks.processResources {
     }
 }
 
-// 配置 Shadow 打包
 tasks.shadowJar {
-    archiveClassifier.set("") // 替换默认的 jar（无 classifier）
-    // 将 Mixin 库重新打包到你的包名下，避免与其他插件冲突
+    dependsOn(tasks.reobfJar)
+    archiveClassifier.set("")
     relocate("org.spongepowered.asm", "main.java.me.dniym.mixin.asm")
 }
 
 tasks.assemble {
-    dependsOn(tasks.reobfJar, tasks.shadowJar) // 同时生成 reobf 和 shadow JAR
+    dependsOn(tasks.shadowJar)
 }
