@@ -113,13 +113,14 @@ tasks.processResources {
 
 // 配置 Shadow 打包
 tasks.shadowJar {
-    // 明确声明 shadowJar 依赖 reobfJar
+    // 确保 shadowJar 在打包前，先执行 reobfJar 任务
     dependsOn(tasks.reobfJar)
-    archiveClassifier.set("")
+    archiveClassifier.set("") // 使用无分类器的名称替换默认 jar
+    // 将 Mixin 库重新打包到你的包名下，避免与其他插件冲突
     relocate("org.spongepowered.asm", "main.java.me.dniym.mixin.asm")
 }
 
-// 让 assemble 只依赖 shadowJar。shadowJar 自身的依赖链已保证 reobfJar 先执行。
-tasks.assemble {
+// 让 build 任务依赖于最终的产出 shadowJar
+tasks.build {
     dependsOn(tasks.shadowJar)
 }
