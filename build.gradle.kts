@@ -72,8 +72,11 @@ dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
     annotationProcessor("com.google.code.gson:gson:2.10.1")
 
-    // 新增：为注解处理器添加 Guava 依赖
+    // Guava 依赖（用于注解处理）
     annotationProcessor("com.google.guava:guava:33.5.0-jre")
+
+    // 新增：为注解处理器添加 ASM 依赖
+    annotationProcessor("org.ow2.asm:asm-util:9.8")
 }
 
 java {
