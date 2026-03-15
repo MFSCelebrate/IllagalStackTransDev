@@ -4,7 +4,8 @@
   "package": "main.java.me.dniym.mixins",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
-    "GenerationChunkHolderMixin"
+    "GenerationChunkHolderMixin",
+    "MinecraftServerMixin"
   ],
   "injectors": {
     "defaultRequire": 1
