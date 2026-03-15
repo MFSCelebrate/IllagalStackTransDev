@@ -13,7 +13,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(GenerationChunkHolder.class)
 public abstract class GenerationChunkHolderMixin {
 
-    @Inject(method = "<init>", at = @At("HEAD"))
+    @Inject(method = "<init>(Lnet/minecraft/world/level/ChunkPos;)V", at = @At("HEAD"))
     private void onInit(ChunkPos chunkPos, CallbackInfo ci) {
         throw new UnsupportedOperationException("GenerationChunkHolder is disabled by plugin");
     }
