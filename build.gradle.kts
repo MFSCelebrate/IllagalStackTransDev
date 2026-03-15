@@ -113,14 +113,19 @@ tasks.processResources {
 
 // 配置 Shadow 打包
 tasks.shadowJar {
-    // 确保 shadowJar 在打包前，先执行 reobfJar 任务
-    dependsOn(tasks.reobfJar)
-    archiveClassifier.set("") // 使用无分类器的名称替换默认 jar
-    // 将 Mixin 库重新打包到你的包名下，避免与其他插件冲突
+    // 关键修改：移除 dependsOn(tasks.reobfJar)
+    // 我们不再显式声明依赖，而是依靠 Paperweight 插件自身的逻辑确保 reobfJar 在 shadowJar 之前运行。
+    // 如果 Paperweight 的设计导致 reobfJar 和 assemble/build 有循环依赖，我们主动切断它。
+    archiveClassifier.set("")
     relocate("org.spongepowered.asm", "main.java.me.dniym.mixin.asm")
 }
 
-// 让 build 任务依赖于最终的产出 shadowJar
+// 重要：我们不再让 assemble 或 build 任务依赖 shadowJar。
+// 如果您需要生成最终的插件 JAR，请直接运行 `./gradlew shadowJar` 命令。
+// 这样，Gradle 就不会在标准构建生命周期中尝试解决循环依赖。
+// 如果您仍然希望通过 `./gradlew build` 触发 shadowJar，可以尝试下面的配置，但风险较高：
+/*
 tasks.build {
     dependsOn(tasks.shadowJar)
 }
+*/
