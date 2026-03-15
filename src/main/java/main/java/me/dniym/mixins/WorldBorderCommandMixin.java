@@ -1,9 +1,9 @@
 package main.java.me.dniym.mixins;
 
 import net.minecraft.server.commands.WorldBorderCommand;
-import main.java.me.dniym.mixin.asm.mixin.Mixin;
-import main.java.me.dniym.mixin.asm.mixin.injection.Constant;
-import main.java.me.dniym.mixin.asm.mixin.injection.ModifyConstant;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.Constant;
+import org.spongepowered.asm.mixin.injection.ModifyConstant;
 
 /**
  * Mixin 用于修改 WorldBorderCommand 中的硬编码边界限制。
