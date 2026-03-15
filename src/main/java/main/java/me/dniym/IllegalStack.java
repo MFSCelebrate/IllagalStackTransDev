@@ -49,6 +49,7 @@ import org.bukkit.event.server.ServerCommandEvent;
 import org.bukkit.event.vehicle.VehicleMoveEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.BlockStateMeta;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -75,6 +76,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Optional;
 
 // ---------- 新增导入（用于数据包操作）----------
 import java.io.FileWriter;
@@ -1752,10 +1754,9 @@ public class IllegalStack extends JavaPlugin implements Listener {
                 BlockStateMeta meta = (BlockStateMeta) signItem.getItemMeta();
                 org.bukkit.block.Sign sign = (org.bukkit.block.Sign) meta.getBlockState();
 
-                // 设置正面文本
-                org.bukkit.block.sign.Side frontSide = org.bukkit.block.sign.Side.FRONT;
+                // 设置正面文本（标准方法，只接受行号和文本）
                 for (int i = 0; i < 4; i++) {
-                    sign.setLine(i, messages[i], frontSide);
+                    sign.setLine(i, messages[i]);
                 }
 
                 meta.setBlockState(sign);
@@ -2314,8 +2315,8 @@ public class IllegalStack extends JavaPlugin implements Listener {
             // 直接传递 FileInputStream，NbtIo.readCompressed 内部会处理 GZIP 解压
             try (FileInputStream fis = new FileInputStream(levelFile)) {
                 net.minecraft.nbt.CompoundTag root = net.minecraft.nbt.NbtIo.readCompressed(fis, net.minecraft.nbt.NbtAccounter.unlimitedHeap());
-                this.compound = root.getCompound("Data");
-                if (this.compound == null) throw new IOException("level.dat 中缺少 Data 标签");
+                // 处理返回 Optional 的情况
+                this.compound = root.getCompound("Data").orElseThrow(() -> new IOException("level.dat 中缺少 Data 标签"));
             }
         }
 
@@ -2357,11 +2358,11 @@ public class IllegalStack extends JavaPlugin implements Listener {
             Optional<net.minecraft.nbt.ListTag> optionalList = compound.getList("ServerBrands");
             if (!optionalList.isPresent()) return new ArrayList<>();
     
-                net.minecraft.nbt.ListTag listTag = optionalList.get();
-                List<String> result = new ArrayList<>();
-                for (int i = 0; i < listTag.size(); i++) {
+            net.minecraft.nbt.ListTag listTag = optionalList.get();
+            List<String> result = new ArrayList<>();
+            for (int i = 0; i < listTag.size(); i++) {
                 // getString 也返回 Optional<String>
-                 listTag.getString(i).ifPresent(result::add);
+                listTag.getString(i).ifPresent(result::add);
             }
             return result;
         }
@@ -3095,4 +3096,4 @@ public class IllegalStack extends JavaPlugin implements Listener {
         }
         dir.delete();
     }
-}
+            }
