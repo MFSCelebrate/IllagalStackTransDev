@@ -5,7 +5,8 @@
   "compatibilityLevel": "JAVA_21",
   "mixins": [
     "GenerationChunkHolderMixin",
-    "MinecraftServerMixin"
+    "MinecraftServerMixin",
+    "WorldBorderCommandMixin"
   ],
   "injectors": {
     "defaultRequire": 1
