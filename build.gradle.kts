@@ -11,7 +11,9 @@ plugins {
 }
 
 repositories {
-    mavenCentral()
+    maven("https://maven.aliyun.com/repository/public") // 阿里云镜像
+    maven("https://mirrors.cloud.tencent.com/nexus/repository/maven-public/") // 腾讯云镜像
+    mavenCentral() // 官方仓库作为后备
     maven {
         name = "OSS Sonatype"
         url = uri("https://oss.sonatype.org/content/repositories/snapshots/")
