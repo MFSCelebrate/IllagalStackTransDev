@@ -68,9 +68,12 @@ dependencies {
     annotationProcessor("org.spongepowered:mixin:0.8.7")
     implementation("org.spongepowered:mixin:0.8.7")
 
-    // 强制使用 implementation 确保 Gson 被正确添加到编译类路径
+    // Gson 依赖（同时用于编译和注解处理）
     implementation("com.google.code.gson:gson:2.10.1")
     annotationProcessor("com.google.code.gson:gson:2.10.1")
+
+    // 新增：为注解处理器添加 Guava 依赖
+    annotationProcessor("com.google.guava:guava:33.5.0-jre")
 }
 
 java {
