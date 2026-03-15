@@ -110,7 +110,7 @@ import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.scheduler.BukkitRunnable;
 
 // ---------- 新增导入（用于 Mixin）----------
-import main.java.me.dniym.mixin.asm.mixin.Mixins;
+import org.spongepowered.asm.mixin.Mixins;
 // -------------------------------------------------
 
 public class IllegalStack extends JavaPlugin implements Listener {
