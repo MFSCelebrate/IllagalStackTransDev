@@ -70,6 +70,7 @@ dependencies {
 
     // 强制使用 implementation 确保 Gson 被正确添加到编译类路径
     implementation("com.google.code.gson:gson:2.10.1")
+    annotationProcessor("com.google.code.gson:gson:2.10.1")
 }
 
 java {
