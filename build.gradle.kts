@@ -110,11 +110,10 @@ tasks.processResources {
     }
 }
 
-// 配置 Shadow 打包
 tasks.shadowJar {
     archiveClassifier.set("")
-    // 将 Mixin 库重定位到你的包下，避免冲突
-    relocate("org.spongepowered.asm", "main.java.me.dniym.mixin.asm")
+    // 暂时注释 relocate，确保 Mixin 类在原始包名下可用
+    // relocate("org.spongepowered.asm", "main.java.me.dniym.mixin.asm")
 }
 
 // 重要：我们不再让 assemble 或 build 任务依赖 shadowJar。
