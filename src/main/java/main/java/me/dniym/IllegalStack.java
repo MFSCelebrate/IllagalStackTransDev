@@ -109,10 +109,6 @@ import java.util.UUID;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.scheduler.BukkitRunnable;
 
-// ---------- 新增导入（用于 Mixin）----------
-import org.spongepowered.asm.mixin.Mixins;
-// -------------------------------------------------
-
 public class IllegalStack extends JavaPlugin implements Listener {
 
     private static final Logger LOGGER = LogManager.getLogger("IllegalStack/" + IllegalStack.class.getSimpleName());
@@ -534,14 +530,8 @@ public class IllegalStack extends JavaPlugin implements Listener {
 
     @Override
     public void onLoad() {
-        // 在插件加载时尝试加载 Mixin 配置
-        try {
-            Mixins.addConfiguration("mixins.json");
-            getLogger().info("Mixin 配置加载成功。");
-        } catch (Throwable t) {
-            // 如果 Mixin 库不存在或配置加载失败，仅记录警告，不影响插件其他功能
-            getLogger().warning("Mixin 配置加载失败，请确保 Mixin 库已正确安装。错误: " + t.getMessage());
-        }
+        // Mixin 配置由 Ignite 自动加载，无需手动添加
+        getLogger().info("插件正在加载...");
     }
 
     @Override
