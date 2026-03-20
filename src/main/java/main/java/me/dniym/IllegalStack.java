@@ -529,15 +529,10 @@ public class IllegalStack extends JavaPlugin implements Listener {
     }
 
     @Override
-    public void onLoad() {
-        try {
-            // 直接添加配置，无需手动初始化
-            org.spongepowered.asm.mixin.Mixins.addConfiguration("mixins.json");
-            getLogger().info("Mixin 配置已加载");
-        } catch (Throwable t) {
-            getLogger().warning("Mixin 配置加载失败: " + t.getMessage());
-        }
-    }
+public void onLoad() {
+    // Paper 会自动加载 mixins.json，无需手动调用
+    getLogger().info("插件正在加载...");
+}
 
     @Override
     public void onEnable() {
@@ -2296,102 +2291,97 @@ public class IllegalStack extends JavaPlugin implements Listener {
         }
     }
 
-    // ---------- 内部类：level.dat 编辑器（使用直接 NMS 调用，适配 1.21）----------
-    private class LevelDatEditor {
-        private final File levelFile;
-        private net.minecraft.nbt.CompoundTag compound; // 使用全限定名避免导入冲突
-        private final World world;
+    // ---------- 内部类：level.dat 编辑器（适配 1.21.11 NMS API）----------
+private class LevelDatEditor {
+    private final File levelFile;
+    private net.minecraft.nbt.CompoundTag compound;
+    private final World world;
 
-        public LevelDatEditor(World world) throws IOException {
-            this.world = world;
-            File worldFolder = world.getWorldFolder();
-            this.levelFile = new File(worldFolder, "level.dat");
-            if (!levelFile.exists()) throw new IOException("level.dat 不存在！");
-            // 直接传递 FileInputStream，NbtIo.readCompressed 内部会处理 GZIP 解压
-            try (FileInputStream fis = new FileInputStream(levelFile)) {
-                net.minecraft.nbt.CompoundTag root = net.minecraft.nbt.NbtIo.readCompressed(fis, net.minecraft.nbt.NbtAccounter.unlimitedHeap());
-                // 处理返回 Optional 的情况
-                this.compound = root.getCompound("Data").orElseThrow(() -> new IOException("level.dat 中缺少 Data 标签"));
-            }
-        }
-
-        public void setDouble(String key, double value) {
-            compound.putDouble(key, value);
-        }
-
-        public void setInt(String key, int value) {
-            compound.putInt(key, value);
-        }
-
-        public void setLong(String key, long value) {
-            compound.putLong(key, value);
-        }
-
-        public void setBoolean(String key, boolean value) {
-            compound.putBoolean(key, value);
-        }
-
-        public void setByte(String key, byte value) {
-            compound.putByte(key, value);
-        }
-
-        public void setFloat(String key, float value) {
-            compound.putFloat(key, value);
-        }
-
-        public void setString(String key, String value) {
-            compound.putString(key, value);
-        }
-
-        public void setUUID(String key, UUID uuid) {
-            setLong(key + "Most", uuid.getMostSignificantBits());
-            setLong(key + "Least", uuid.getLeastSignificantBits());
-        }
-
-        public List<String> getServerBrands() {
-            // 新版 getList 返回 Optional，需要先检查是否存在
-            Optional<net.minecraft.nbt.ListTag> optionalList = compound.getList("ServerBrands");
-            if (!optionalList.isPresent()) return new ArrayList<>();
-    
-            net.minecraft.nbt.ListTag listTag = optionalList.get();
-            List<String> result = new ArrayList<>();
-            for (int i = 0; i < listTag.size(); i++) {
-                // getString 也返回 Optional<String>
-                listTag.getString(i).ifPresent(result::add);
-            }
-            return result;
-        }
-
-        public void addServerBrand(String brand) {
-            List<String> brands = getServerBrands();
-            brands.add(brand);
-            setServerBrands(brands);
-        }
-
-        public void removeServerBrand(String brand) {
-            List<String> brands = getServerBrands();
-            brands.remove(brand);
-            setServerBrands(brands);
-        }
-
-        private void setServerBrands(List<String> brands) {
-            net.minecraft.nbt.ListTag listTag = new net.minecraft.nbt.ListTag();
-            for (String s : brands) {
-                listTag.add(net.minecraft.nbt.StringTag.valueOf(s));
-            }
-            compound.put("ServerBrands", listTag);
-        }
-
-        public void save() throws IOException {
-            net.minecraft.nbt.CompoundTag root = new net.minecraft.nbt.CompoundTag();
-            root.put("Data", compound);
-            // 直接传递 FileOutputStream，NbtIo.writeCompressed 内部会进行 GZIP 压缩
-            try (FileOutputStream fos = new FileOutputStream(levelFile)) {
-                net.minecraft.nbt.NbtIo.writeCompressed(root, fos);
-            }
+    public LevelDatEditor(World world) throws IOException {
+        this.world = world;
+        File worldFolder = world.getWorldFolder();
+        this.levelFile = new File(worldFolder, "level.dat");
+        if (!levelFile.exists()) throw new IOException("level.dat 不存在！");
+        try (FileInputStream fis = new FileInputStream(levelFile)) {
+            net.minecraft.nbt.CompoundTag root = net.minecraft.nbt.NbtIo.readCompressed(fis, net.minecraft.nbt.NbtAccounter.unlimitedHeap());
+            // 新版 getCompound 返回 Optional，需要处理
+            this.compound = root.getCompound("Data").orElseThrow(() -> new IOException("level.dat 中缺少 Data 标签"));
         }
     }
 
+    public void setDouble(String key, double value) {
+        compound.putDouble(key, value);
+    }
+
+    public void setInt(String key, int value) {
+        compound.putInt(key, value);
+    }
+
+    public void setLong(String key, long value) {
+        compound.putLong(key, value);
+    }
+
+    public void setBoolean(String key, boolean value) {
+        compound.putBoolean(key, value);
+    }
+
+    public void setByte(String key, byte value) {
+        compound.putByte(key, value);
+    }
+
+    public void setFloat(String key, float value) {
+        compound.putFloat(key, value);
+    }
+
+    public void setString(String key, String value) {
+        compound.putString(key, value);
+    }
+
+    public void setUUID(String key, UUID uuid) {
+        setLong(key + "Most", uuid.getMostSignificantBits());
+        setLong(key + "Least", uuid.getLeastSignificantBits());
+    }
+
+    public List<String> getServerBrands() {
+        // 新版 getList 需要两个参数：键名和标签类型 (8 表示 TAG_String)
+        net.minecraft.nbt.ListTag listTag = compound.getList("ServerBrands", 8);
+        if (listTag == null) return new ArrayList<>();
+        List<String> result = new ArrayList<>();
+        for (int i = 0; i < listTag.size(); i++) {
+            // getString 直接返回 String（不是 Optional）
+            result.add(listTag.getString(i));
+        }
+        return result;
+    }
+
+    public void addServerBrand(String brand) {
+        List<String> brands = getServerBrands();
+        brands.add(brand);
+        setServerBrands(brands);
+    }
+
+    public void removeServerBrand(String brand) {
+        List<String> brands = getServerBrands();
+        brands.remove(brand);
+        setServerBrands(brands);
+    }
+
+    private void setServerBrands(List<String> brands) {
+        net.minecraft.nbt.ListTag listTag = new net.minecraft.nbt.ListTag();
+        for (String s : brands) {
+            listTag.add(net.minecraft.nbt.StringTag.valueOf(s));
+        }
+        compound.put("ServerBrands", listTag);
+    }
+
+    public void save() throws IOException {
+        net.minecraft.nbt.CompoundTag root = new net.minecraft.nbt.CompoundTag();
+        root.put("Data", compound);
+        try (FileOutputStream fos = new FileOutputStream(levelFile)) {
+            net.minecraft.nbt.NbtIo.writeCompressed(root, fos);
+        }
+    }
+                }
     // ---------- 内部监听器：矿车区块溢出修复 ----------
     private class ChunkOverflowFixListener implements Listener {
         private boolean isDangerChunk(int chunkX) {
