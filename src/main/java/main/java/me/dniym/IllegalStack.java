@@ -2343,15 +2343,14 @@ private class LevelDatEditor {
     }
 
     public List<String> getServerBrands() {
-        // 新版 getList 需要两个参数：键名和标签类型 (8 表示 TAG_String)
-        net.minecraft.nbt.ListTag listTag = compound.getList("ServerBrands", 8);
-        if (listTag == null) return new ArrayList<>();
-        List<String> result = new ArrayList<>();
-        for (int i = 0; i < listTag.size(); i++) {
-            // getString 直接返回 String（不是 Optional）
-            result.add(listTag.getString(i));
-        }
-        return result;
+    Optional<net.minecraft.nbt.ListTag> optionalList = compound.getList("ServerBrands");
+    if (!optionalList.isPresent()) return new ArrayList<>();
+    net.minecraft.nbt.ListTag listTag = optionalList.get();
+    List<String> result = new ArrayList<>();
+    for (int i = 0; i < listTag.size(); i++) {
+        listTag.getString(i).ifPresent(result::add);
+    }
+    return result;
     }
 
     public void addServerBrand(String brand) {
