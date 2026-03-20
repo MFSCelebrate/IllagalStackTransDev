@@ -530,8 +530,15 @@ public class IllegalStack extends JavaPlugin implements Listener {
 
     @Override
     public void onLoad() {
-        // Mixin 配置由 Ignite 自动加载，无需手动添加
-        getLogger().info("插件正在加载...");
+        try {
+            // 初始化 Mixin 环境
+            org.spongepowered.asm.mixin.MixinBootstrap.init();
+            // 加载你的 mixin 配置
+            org.spongepowered.asm.mixin.Mixins.addConfiguration("mixins.json");
+            getLogger().info("Mixin 初始化成功");
+        } catch (Throwable t) {
+            getLogger().warning("Mixin 初始化失败: " + t.getMessage());
+        }
     }
 
     @Override
