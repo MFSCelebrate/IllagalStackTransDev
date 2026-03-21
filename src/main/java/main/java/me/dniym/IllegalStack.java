@@ -530,8 +530,12 @@ public class IllegalStack extends JavaPlugin implements Listener {
 
     @Override
 public void onLoad() {
-    // Paper 会自动加载 mixins.json，无需手动添加
-    getLogger().info("插件正在加载...");
+    try {
+    Class.forName("org.spongepowered.asm.mixin.Mixin");
+    getLogger().info("Mixin 类存在！");
+} catch (ClassNotFoundException e) {
+    getLogger().warning("Mixin 类不存在，Mixin 未被加载！");
+    };
 }
     
     @Override
