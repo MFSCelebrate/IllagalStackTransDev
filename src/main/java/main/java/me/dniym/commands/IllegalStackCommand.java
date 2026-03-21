@@ -10,9 +10,8 @@ import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.command.Command;
-import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
-import org.bukkit.command.TabCompleter;
+import org.bukkit.command.TabExecutor;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -21,9 +20,23 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
-public class IllegalStackCommand implements CommandExecutor, TabCompleter {
+public class IllegalStackCommand extends Command implements TabExecutor {
+
+    public IllegalStackCommand(String name, String description, String usageMessage, List<String> aliases) {
+        super(name, description, usageMessage, aliases);
+    }
 
     @Override
+    public boolean execute(@NotNull CommandSender sender, @NotNull String commandLabel, @NotNull String[] args) {
+        return onCommand(sender, this, commandLabel, args);
+    }
+
+    @Override
+    public @Nullable List<String> tabComplete(@NotNull CommandSender sender, @NotNull String alias, @NotNull String[] args) throws IllegalArgumentException {
+        return onTabComplete(sender, this, alias, args);
+    }
+
+    // ---------- 以下为原 IllegalStackCommand 的 onCommand 和 onTabComplete 内容（未做逻辑修改） ----------
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
 
         if (args.length == 1) {
@@ -376,7 +389,7 @@ public class IllegalStackCommand implements CommandExecutor, TabCompleter {
         Scheduler.runTaskLater(IllegalStack.getPlugin(), () -> IllegalStack.getPlugin().getServer().dispatchCommand(sender, "istack prot"), 5);
     }
 
-    @Override
+    // ---------- 原有的 onTabComplete 内容 ----------
     public @Nullable List<String> onTabComplete(@NotNull final CommandSender sender, @NotNull final Command command, @NotNull final String label, final @NotNull String[] args) {
 
         List<String> arguments = new ArrayList<>();
@@ -395,5 +408,4 @@ public class IllegalStackCommand implements CommandExecutor, TabCompleter {
         }
         return null;
     }
-
-}
+                            }
