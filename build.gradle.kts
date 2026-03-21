@@ -88,9 +88,17 @@ configurations.all {
     }
 }
 
+configurations {
+    annotationProcessor {
+        extendsFrom(configurations.compileClasspath.get())
+    }
+}
+
 tasks.compileJava {
     options.release = 21
     options.encoding = "UTF-8"
+    // 确保注解处理器被使用
+    options.annotationProcessorPath = configurations.annotationProcessor.get()
     classpath = classpath + configurations.compileClasspath.get()
 }
 
