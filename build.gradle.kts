@@ -83,9 +83,6 @@ configurations.all {
 tasks.compileJava {
     options.release = 21
     options.encoding = "UTF-8"
-    doFirst {
-        println("Compile classpath: ${classpath.files.joinToString("\n")}")
-    }
 }
 
 version = "3.1.0-IllagalStackTrans"
