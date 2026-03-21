@@ -61,6 +61,9 @@ dependencies {
     // 已有依赖保留...
     compileOnly("org.spongepowered:mixin:0.8.7")
     annotationProcessor("org.spongepowered:mixin:0.8.7")
+    annotationProcessor("org.ow2.asm:asm:9.8")
+    annotationProcessor("org.ow2.asm:asm-commons:9.8")
+    annotationProcessor("org.ow2.asm:asm-tree:9.8")
     annotationProcessor("com.google.code.gson:gson:2.10.1")
     annotationProcessor("com.google.guava:guava:33.5.0-jre")  // 新增
 
