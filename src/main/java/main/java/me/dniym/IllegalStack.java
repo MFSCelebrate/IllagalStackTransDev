@@ -12,6 +12,11 @@ import main.java.me.dniym.listeners.fListener;
 import main.java.me.dniym.listeners.mcMMOListener;
 import main.java.me.dniym.listeners.pLisbListener;
 import main.java.me.dniym.timers.fTimer;
+import java.lang.instrument.ClassFileTransformer;
+import java.lang.instrument.Instrumentation;
+import java.lang.instrument.IllegalClassFormatException;
+import java.security.ProtectionDomain;
+import org.objectweb.asm.*;
 import main.java.me.dniym.timers.sTimer;
 import main.java.me.dniym.timers.syncTimer;
 import main.java.me.dniym.utils.Scheduler;
@@ -618,9 +623,12 @@ private byte[] patchWorldBorderCommand(byte[] classBytes) {
 
     private Instrumentation getInstrumentation() {
     try {
-        // 通过 CraftServer 获取 MinecraftServer 实例
-        CraftServer craftServer = (CraftServer) Bukkit.getServer();
-        Object mcServer = craftServer.getServer(); // net.minecraft.server.MinecraftServer
+        // 获取 CraftServer 实例
+        Object server = Bukkit.getServer();
+        // 调用 getServer() 方法获取 MinecraftServer
+        Method getServerMethod = server.getClass().getMethod("getServer");
+        Object mcServer = getServerMethod.invoke(server);
+        // 获取 getInstrumentation 方法并调用
         Method getInstrumentation = mcServer.getClass().getMethod("getInstrumentation");
         return (Instrumentation) getInstrumentation.invoke(mcServer);
     } catch (Exception e) {
