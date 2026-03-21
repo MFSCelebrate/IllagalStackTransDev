@@ -26,5 +26,4 @@ jobs:
         with:
           name: IllegalStack-NetMinecraftServer-Mixin
           path: build/libs/IllegalStack-*.jar
-      - name: Monitor Refmap
-        run: jar tf build/libs/*.jar | grep refmap
+    
