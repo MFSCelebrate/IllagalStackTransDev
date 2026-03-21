@@ -9,5 +9,6 @@ load-before: [MythicDrops]
 
 mixins:
   - mixins.json
+verbose: true
 
 main: main.java.me.dniym.IllegalStack
