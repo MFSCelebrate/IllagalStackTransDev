@@ -7,4 +7,6 @@ authors: [dNiym, Loving11ish, MFS-Mysterious Frame Slot]
 softdepend: [Magic, Factions, NBTAPI, ProtocolLib, Slimefun, CraftingStore, DynamicShop, ClueScrolls, mcMMO, JetsMinions, SmartInvs, FactionsX]
 load-before: [MythicDrops]
 
+mixins: - mixins.json
+
 main: main.java.me.dniym.IllegalStack
