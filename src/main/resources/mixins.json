@@ -1,0 +1,7 @@
+{
+  "package": "main.java.me.dniym.mixins",
+  "mixins": [
+    "MinecraftServerMixin",
+    "WorldBorderCommandMixin"
+  ]
+}
