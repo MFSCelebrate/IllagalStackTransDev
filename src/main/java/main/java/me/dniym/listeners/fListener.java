@@ -120,7 +120,7 @@ import org.bukkit.inventory.meta.BlockStateMeta;
 import org.bukkit.inventory.meta.BookMeta;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.util.Vector;
-import org.spigotmc.event.entity.EntityMountEvent;
+//import org.spigotmc.event.entity.EntityMountEvent;
 
 import java.nio.charset.Charset;
 import java.util.ArrayList;
@@ -627,7 +627,7 @@ public class fListener implements Listener {
      * 用水桶等破坏末地传送门
      */
 
-    @EventHandler
+    /*@EventHandler
     public void onEntityMount(EntityMountEvent e) {
 
         if (e.getMount() instanceof Player) {
@@ -640,7 +640,7 @@ public class fListener implements Listener {
         		v.getCollidableExemptions().add(e.getMount().getUniqueId());
         		e.setCancelled(true);
         	}
-        }
+        }*/
 
         if (Protections.PreventHeadInsideBlock.isEnabled() && e.getEntity() instanceof Player) {
             Player driver = (Player) e.getEntity();
