@@ -21,6 +21,10 @@ repositories {
         url = uri("https://repo.papermc.io/repository/maven-public/")
     }
     maven {
+        name = "SpongePowered"
+        url = uri("https://repo.spongepowered.org/maven/")
+    }
+    maven {
         name = "ProtocolLib"
         url = uri("https://repo.dmulloy2.net/repository/public/")
     }
@@ -101,15 +105,4 @@ tasks.processResources {
 
 tasks.shadowJar {
     archiveClassifier.set("")
-    // 注释掉 relocate，避免解析 Java 21 类文件
-    // relocate("org.objectweb.asm", "main.java.me.dniym.libs.asm")
-    
-    // 可选：排除不必要的依赖，但 ASM 会被保留
-    exclude {
-        it.name.contains("paper-api") ||
-        it.name.contains("folia-api") ||
-        it.name.contains("netty-all") ||
-        // 可根据需要继续添加其他排除项
-        false  // 默认不排除，只排除上面列出的
-    }
 }
