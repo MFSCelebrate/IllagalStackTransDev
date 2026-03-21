@@ -7,7 +7,7 @@ plugins {
     idea
     eclipse
     id("io.papermc.paperweight.userdev") version "2.0.0-beta.18"
-    id("com.github.johnrengelman.shadow") version "8.1.2" // 用于打包 ASM 等依赖
+    id("com.github.johnrengelman.shadow") version "8.1.1" // 用于打包 ASM 等依赖
 }
 
 repositories {
@@ -97,15 +97,15 @@ tasks.processResources {
 
 tasks.shadowJar {
     archiveClassifier.set("")
-    relocate("org.objectweb.asm", "main.java.me.dniym.libs.asm")
+    // 注释掉 relocate，避免解析 Java 21 类文件
+    // relocate("org.objectweb.asm", "main.java.me.dniym.libs.asm")
     
-    // 排除 paperweight 映射 jar
-    exclude("**/mappedServerJar.jar")
-    
-    // 排除其他可能冲突的 jar
+    // 可选：排除不必要的依赖，但 ASM 会被保留
     exclude {
         it.name.contains("paper-api") ||
         it.name.contains("folia-api") ||
-        it.name.contains("netty-all")  // netty 通常由服务器提供，不应打包
+        it.name.contains("netty-all") ||
+        // 可根据需要继续添加其他排除项
+        false  // 默认不排除，只排除上面列出的
     }
 }
