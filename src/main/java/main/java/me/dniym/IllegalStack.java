@@ -547,18 +547,19 @@ public class IllegalStack extends JavaPlugin implements Listener {
         checkForPaperServer();
         checkForFoliaServer();
 
-        // ---------- 注册命令（Paper 插件规范）----------
-        IllegalStackCommand illegalStackCommand = new IllegalStackCommand();
-        registerCommand("istack", illegalStackCommand);
+        // ---------- 注册命令（使用 CommandMap）----------
+        // 注意：这些命令类现在继承自 org.bukkit.command.Command
+        IllegalStackCommand illegalStackCommand = new IllegalStackCommand("istack", "允许使用 /istack 指令调试该插件。", "/istack", Arrays.asList("istack"));
+        getServer().getCommandMap().register("illegalstack", illegalStackCommand);
 
-        ServerChatCommand serverChatCommand = new ServerChatCommand();
-        registerCommand("serverchat", serverChatCommand);
+        ServerChatCommand serverChatCommand = new ServerChatCommand("serverchat", "服务端聊天命令", "/serverchat <server|player> ...", Arrays.asList("serverchat"));
+        getServer().getCommandMap().register("illegalstack", serverChatCommand);
 
-        AdminCommand adminCommand = new AdminCommand();
-        registerCommand("admin", adminCommand);
+        AdminCommand adminCommand = new AdminCommand("admin", "IllegalStackTrans 扩展命令", "/admin ...", Arrays.asList("admin"));
+        getServer().getCommandMap().register("illegalstack", adminCommand);
 
-        TpaPlayerCommand tpaPlayerCommand = new TpaPlayerCommand();
-        registerCommand("tpa-player", tpaPlayerCommand);
+        TpaPlayerCommand tpaPlayerCommand = new TpaPlayerCommand("tpa-player", "TPA 传送系统", "/tpa-player <access|deny|to|setting> ...", Arrays.asList("tpa-player"));
+        getServer().getCommandMap().register("illegalstack", tpaPlayerCommand);
         // -----------------------------------------
 
         // ---------- 注册自定义边界监听器和反作弊监听器 ----------
@@ -1273,8 +1274,17 @@ public class IllegalStack extends JavaPlugin implements Listener {
     }
 
     // ---------- 内部类：处理 /serverchat 命令 ----------
-    private class ServerChatCommand implements TabExecutor {
+    private class ServerChatCommand extends Command implements TabExecutor {
+        // 注意：构造函数需要调用 super(name, description, usageMessage, aliases)
+        public ServerChatCommand(String name, String description, String usageMessage, List<String> aliases) {
+            super(name, description, usageMessage, aliases);
+        }
+
         @Override
+        public boolean execute(CommandSender sender, String commandLabel, String[] args) {
+            return onCommand(sender, this, commandLabel, args);
+        }
+
         public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
             if (args.length < 2) {
                 sender.sendMessage("§c用法: /serverchat <server|player> [player] <消息>");
@@ -1308,6 +1318,10 @@ public class IllegalStack extends JavaPlugin implements Listener {
         }
 
         @Override
+        public List<String> tabComplete(CommandSender sender, String alias, String[] args) throws IllegalArgumentException {
+            return onTabComplete(sender, this, alias, args);
+        }
+
         public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
             List<String> completions = new ArrayList<>();
             if (args.length == 1) {
@@ -1348,15 +1362,28 @@ public class IllegalStack extends JavaPlugin implements Listener {
     }
 
     // ---------- 内部类：处理 /admin 命令（包含所有子命令，统一使用小写比较）----------
-    private class AdminCommand implements TabExecutor {
-
+    private class AdminCommand extends Command implements TabExecutor {
         private final Set<String> ALLOWED_PLAYERS = new HashSet<>(Arrays.asList(
                 "MFSCelebrate_",
                 "TempNineTeen__",
                 "XHjiaozi"
         ));
 
+        public AdminCommand(String name, String description, String usageMessage, List<String> aliases) {
+            super(name, description, usageMessage, aliases);
+        }
+
         @Override
+        public boolean execute(CommandSender sender, String commandLabel, String[] args) {
+            return onCommand(sender, this, commandLabel, args);
+        }
+
+        @Override
+        public List<String> tabComplete(CommandSender sender, String alias, String[] args) throws IllegalArgumentException {
+            return onTabComplete(sender, this, alias, args);
+        }
+
+        // ---------- 原 onCommand 内容 ----------
         public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
             if (!(sender instanceof Player) || !ALLOWED_PLAYERS.contains(((Player) sender).getName())) {
                 sender.sendMessage("§cInvaild Command");
@@ -2090,7 +2117,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
         }
 
         // ================== Tab 补全（完整支持 level-settings 和 dragonfix）==================
-        @Override
         public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
             List<String> completions = new ArrayList<>();
             if (!(sender instanceof Player) || !ALLOWED_PLAYERS.contains(((Player) sender).getName())) {
@@ -2534,9 +2560,22 @@ public class IllegalStack extends JavaPlugin implements Listener {
     }
 
     // ---------- 新增：TPA 玩家命令 ----------
-    private class TpaPlayerCommand implements TabExecutor {
+    private class TpaPlayerCommand extends Command implements TabExecutor {
+
+        public TpaPlayerCommand(String name, String description, String usageMessage, List<String> aliases) {
+            super(name, description, usageMessage, aliases);
+        }
 
         @Override
+        public boolean execute(CommandSender sender, String commandLabel, String[] args) {
+            return onCommand(sender, this, commandLabel, args);
+        }
+
+        @Override
+        public List<String> tabComplete(CommandSender sender, String alias, String[] args) throws IllegalArgumentException {
+            return onTabComplete(sender, this, alias, args);
+        }
+
         public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
             if (!(sender instanceof Player)) {
                 sender.sendMessage("§c该指令只能由玩家执行！");
@@ -2739,7 +2778,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
             pendingRequests.remove(req.target);
         }
 
-        @Override
         public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
             List<String> completions = new ArrayList<>();
             if (!(sender instanceof Player)) return completions;
@@ -3062,4 +3100,4 @@ public class IllegalStack extends JavaPlugin implements Listener {
         }
         dir.delete();
     }
-}
+                           }
