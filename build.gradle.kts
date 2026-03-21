@@ -58,8 +58,11 @@ dependencies {
     compileOnly("com.github.brcdev-minecraft:shopgui-api:3.0.0") {
         exclude(group = "org.spigotmc", module = "spigot-api")
     }
+    // 已有依赖保留...
     compileOnly("org.spongepowered:mixin:0.8.7")
     annotationProcessor("org.spongepowered:mixin:0.8.7")
+    annotationProcessor("com.google.code.gson:gson:2.10.1")  // 新增
+
 }
 
 java {
