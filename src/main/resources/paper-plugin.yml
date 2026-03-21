@@ -10,4 +10,4 @@ load-before: [MythicDrops]
 main: main.java.me.dniym.IllegalStack
 
 server-modifications:
-  - main.java.me.dniym.ServerModifierImpl
+  - main.java.me.dniym.net.minecraft.server.BBC.ServerModifierImpl
