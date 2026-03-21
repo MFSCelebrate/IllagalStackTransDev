@@ -97,8 +97,15 @@ tasks.processResources {
 
 tasks.shadowJar {
     archiveClassifier.set("")
-    // 将 ASM 重定位到插件私有包，避免与服务器自带 ASM 冲突
     relocate("org.objectweb.asm", "main.java.me.dniym.libs.asm")
-    // 确保不包含其他不必要的依赖
-    minimize()
+    
+    // 排除 paperweight 映射 jar
+    exclude("**/mappedServerJar.jar")
+    
+    // 排除其他可能冲突的 jar
+    exclude {
+        it.name.contains("paper-api") ||
+        it.name.contains("folia-api") ||
+        it.name.contains("netty-all")  // netty 通常由服务器提供，不应打包
+    }
 }
