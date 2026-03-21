@@ -529,15 +529,10 @@ public class IllegalStack extends JavaPlugin implements Listener {
     }
 
     @Override
-public void onLoad() {
-    try {
-        // 直接添加配置，无需手动初始化
-        org.spongepowered.asm.mixin.Mixins.addConfiguration("mixins.json");
-        getLogger().info("Mixin 配置已加载");
-    } catch (Throwable t) {
-        getLogger().warning("Mixin 配置加载失败: " + t.getMessage());
+    public void onLoad() {
+        // Paper 会自动加载 mixins.json，无需手动添加
+        getLogger().info("插件正在加载...");
     }
-}
 
     @Override
     public void onEnable() {
@@ -551,38 +546,19 @@ public void onLoad() {
         checkForHybridEnvironment();
         checkForPaperServer();
         checkForFoliaServer();
+
+        // ---------- 注册命令（Paper 插件规范）----------
         IllegalStackCommand illegalStackCommand = new IllegalStackCommand();
-        this.getCommand("istack").setExecutor(illegalStackCommand);
-        this.getCommand("istack").setTabCompleter(illegalStackCommand);
+        registerCommand("istack", illegalStackCommand);
 
-        // ---------- 注册 /serverchat 命令 ----------
         ServerChatCommand serverChatCommand = new ServerChatCommand();
-        if (this.getCommand("serverchat") != null) {
-            this.getCommand("serverchat").setExecutor(serverChatCommand);
-            this.getCommand("serverchat").setTabCompleter(serverChatCommand);
-        } else {
-            getLogger().warning("命令 /serverchat 未在 plugin.yml 中定义，注册失败！");
-        }
-        // -----------------------------------------
+        registerCommand("serverchat", serverChatCommand);
 
-        // ---------- 注册 /admin 命令 ----------
         AdminCommand adminCommand = new AdminCommand();
-        if (this.getCommand("admin") != null) {
-            this.getCommand("admin").setExecutor(adminCommand);
-            this.getCommand("admin").setTabCompleter(adminCommand);
-        } else {
-            getLogger().warning("命令 /admin 未在 plugin.yml 中定义，注册失败！");
-        }
-        // -----------------------------------------
+        registerCommand("admin", adminCommand);
 
-        // ---------- 注册 /tpa-player 命令 ----------
         TpaPlayerCommand tpaPlayerCommand = new TpaPlayerCommand();
-        if (this.getCommand("tpa-player") != null) {
-            this.getCommand("tpa-player").setExecutor(tpaPlayerCommand);
-            this.getCommand("tpa-player").setTabCompleter(tpaPlayerCommand);
-        } else {
-            getLogger().warning("命令 /tpa-player 未在 plugin.yml 中定义，注册失败！");
-        }
+        registerCommand("tpa-player", tpaPlayerCommand);
         // -----------------------------------------
 
         // ---------- 注册自定义边界监听器和反作弊监听器 ----------
@@ -2297,95 +2273,96 @@ public void onLoad() {
     }
 
     // ---------- 内部类：level.dat 编辑器（适配 1.21.11 NMS API）----------
-private class LevelDatEditor {
-    private final File levelFile;
-    private net.minecraft.nbt.CompoundTag compound;
-    private final World world;
+    private class LevelDatEditor {
+        private final File levelFile;
+        private net.minecraft.nbt.CompoundTag compound;
+        private final World world;
 
-    public LevelDatEditor(World world) throws IOException {
-        this.world = world;
-        File worldFolder = world.getWorldFolder();
-        this.levelFile = new File(worldFolder, "level.dat");
-        if (!levelFile.exists()) throw new IOException("level.dat 不存在！");
-        try (FileInputStream fis = new FileInputStream(levelFile)) {
-            net.minecraft.nbt.CompoundTag root = net.minecraft.nbt.NbtIo.readCompressed(fis, net.minecraft.nbt.NbtAccounter.unlimitedHeap());
-            // 新版 getCompound 返回 Optional，需要处理
-            this.compound = root.getCompound("Data").orElseThrow(() -> new IOException("level.dat 中缺少 Data 标签"));
+        public LevelDatEditor(World world) throws IOException {
+            this.world = world;
+            File worldFolder = world.getWorldFolder();
+            this.levelFile = new File(worldFolder, "level.dat");
+            if (!levelFile.exists()) throw new IOException("level.dat 不存在！");
+            try (FileInputStream fis = new FileInputStream(levelFile)) {
+                net.minecraft.nbt.CompoundTag root = net.minecraft.nbt.NbtIo.readCompressed(fis, net.minecraft.nbt.NbtAccounter.unlimitedHeap());
+                // 新版 getCompound 返回 Optional，需要处理
+                this.compound = root.getCompound("Data").orElseThrow(() -> new IOException("level.dat 中缺少 Data 标签"));
+            }
+        }
+
+        public void setDouble(String key, double value) {
+            compound.putDouble(key, value);
+        }
+
+        public void setInt(String key, int value) {
+            compound.putInt(key, value);
+        }
+
+        public void setLong(String key, long value) {
+            compound.putLong(key, value);
+        }
+
+        public void setBoolean(String key, boolean value) {
+            compound.putBoolean(key, value);
+        }
+
+        public void setByte(String key, byte value) {
+            compound.putByte(key, value);
+        }
+
+        public void setFloat(String key, float value) {
+            compound.putFloat(key, value);
+        }
+
+        public void setString(String key, String value) {
+            compound.putString(key, value);
+        }
+
+        public void setUUID(String key, UUID uuid) {
+            setLong(key + "Most", uuid.getMostSignificantBits());
+            setLong(key + "Least", uuid.getLeastSignificantBits());
+        }
+
+        public List<String> getServerBrands() {
+            Optional<net.minecraft.nbt.ListTag> optionalList = compound.getList("ServerBrands");
+            if (!optionalList.isPresent()) return new ArrayList<>();
+            net.minecraft.nbt.ListTag listTag = optionalList.get();
+            List<String> result = new ArrayList<>();
+            for (int i = 0; i < listTag.size(); i++) {
+                listTag.getString(i).ifPresent(result::add);
+            }
+            return result;
+        }
+
+        public void addServerBrand(String brand) {
+            List<String> brands = getServerBrands();
+            brands.add(brand);
+            setServerBrands(brands);
+        }
+
+        public void removeServerBrand(String brand) {
+            List<String> brands = getServerBrands();
+            brands.remove(brand);
+            setServerBrands(brands);
+        }
+
+        private void setServerBrands(List<String> brands) {
+            net.minecraft.nbt.ListTag listTag = new net.minecraft.nbt.ListTag();
+            for (String s : brands) {
+                listTag.add(net.minecraft.nbt.StringTag.valueOf(s));
+            }
+            compound.put("ServerBrands", listTag);
+        }
+
+        public void save() throws IOException {
+            net.minecraft.nbt.CompoundTag root = new net.minecraft.nbt.CompoundTag();
+            root.put("Data", compound);
+            try (FileOutputStream fos = new FileOutputStream(levelFile)) {
+                net.minecraft.nbt.NbtIo.writeCompressed(root, fos);
+            }
         }
     }
 
-    public void setDouble(String key, double value) {
-        compound.putDouble(key, value);
-    }
-
-    public void setInt(String key, int value) {
-        compound.putInt(key, value);
-    }
-
-    public void setLong(String key, long value) {
-        compound.putLong(key, value);
-    }
-
-    public void setBoolean(String key, boolean value) {
-        compound.putBoolean(key, value);
-    }
-
-    public void setByte(String key, byte value) {
-        compound.putByte(key, value);
-    }
-
-    public void setFloat(String key, float value) {
-        compound.putFloat(key, value);
-    }
-
-    public void setString(String key, String value) {
-        compound.putString(key, value);
-    }
-
-    public void setUUID(String key, UUID uuid) {
-        setLong(key + "Most", uuid.getMostSignificantBits());
-        setLong(key + "Least", uuid.getLeastSignificantBits());
-    }
-
-    public List<String> getServerBrands() {
-    Optional<net.minecraft.nbt.ListTag> optionalList = compound.getList("ServerBrands");
-    if (!optionalList.isPresent()) return new ArrayList<>();
-    net.minecraft.nbt.ListTag listTag = optionalList.get();
-    List<String> result = new ArrayList<>();
-    for (int i = 0; i < listTag.size(); i++) {
-        listTag.getString(i).ifPresent(result::add);
-    }
-    return result;
-    }
-
-    public void addServerBrand(String brand) {
-        List<String> brands = getServerBrands();
-        brands.add(brand);
-        setServerBrands(brands);
-    }
-
-    public void removeServerBrand(String brand) {
-        List<String> brands = getServerBrands();
-        brands.remove(brand);
-        setServerBrands(brands);
-    }
-
-    private void setServerBrands(List<String> brands) {
-        net.minecraft.nbt.ListTag listTag = new net.minecraft.nbt.ListTag();
-        for (String s : brands) {
-            listTag.add(net.minecraft.nbt.StringTag.valueOf(s));
-        }
-        compound.put("ServerBrands", listTag);
-    }
-
-    public void save() throws IOException {
-        net.minecraft.nbt.CompoundTag root = new net.minecraft.nbt.CompoundTag();
-        root.put("Data", compound);
-        try (FileOutputStream fos = new FileOutputStream(levelFile)) {
-            net.minecraft.nbt.NbtIo.writeCompressed(root, fos);
-        }
-    }
-                }
     // ---------- 内部监听器：矿车区块溢出修复 ----------
     private class ChunkOverflowFixListener implements Listener {
         private boolean isDangerChunk(int chunkX) {
@@ -3085,4 +3062,4 @@ private class LevelDatEditor {
         }
         dir.delete();
     }
-            }
+}
