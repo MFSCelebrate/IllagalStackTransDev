@@ -13,11 +13,14 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 21           # 改为 JDK 21
+          java-version: 21
+      - name: Check Java version
+        run: java -version
       - name: Clean Build
         run: |
           chmod +x gradlew
-          ./gradlew shadowJar --stacktrace
+          ./gradlew clean shadowJar --stacktrace --info --refresh-dependencies
+        # env 块可以省略，因为 JAVA_HOME 已被正确设置
       - name: Archive Artifacts
         uses: actions/upload-artifact@v4
         with:
