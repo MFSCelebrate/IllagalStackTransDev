@@ -7,8 +7,8 @@ import org.spongepowered.asm.mixin.injection.ModifyConstant;
 
 @Mixin(MinecraftServer.class)
 public class MinecraftServerMixin {
-    @ModifyConstant(method = "getAbsoluteMaxWorldSize", constant = @Constant(intValue = 30000000))
+    @ModifyConstant(method = "*", constant = @Constant(intValue = 30000000))
     private int modifyMaxWorldSize(int original) {
-        return 2147483646; // Integer.MAX_VALUE - 1
+        return 2147483646;
     }
 }
