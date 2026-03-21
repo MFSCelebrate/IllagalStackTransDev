@@ -83,6 +83,7 @@ configurations.all {
 tasks.compileJava {
     options.release = 21
     options.encoding = "UTF-8"
+    classpath = classpath + configurations.compileClasspath.get()
 }
 
 version = "3.1.0-IllagalStackTrans"
