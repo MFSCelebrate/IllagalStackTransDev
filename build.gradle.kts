@@ -7,7 +7,7 @@ plugins {
     idea
     eclipse
     id("io.papermc.paperweight.userdev") version "2.0.0-beta.18"
-    id("com.github.johnrengelman.shadow") version "8.1.1" // 用于打包 ASM 等依赖
+    id("com.github.johnrengelman.shadow") version "8.1.2" // 用于打包 ASM 等依赖
 }
 
 repositories {
