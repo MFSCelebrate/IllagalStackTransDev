@@ -530,10 +530,105 @@ public class IllegalStack extends JavaPlugin implements Listener {
 
     @Override
 public void onLoad() {
-    // Paper 会自动加载 mixins.json，无需手动添加
-    getLogger().info("这Mixin太有力气了，但是插件正在加载...");
+    getLogger().info("IllegalStackTrans 正在加载，注册字节码转换器...");
+    Instrumentation instrumentation = getInstrumentation();
+    if (instrumentation == null) {
+        getLogger().warning("无法获取 Instrumentation，世界边界修改将无效！");
+        return;
+    }
+    instrumentation.addTransformer(new ClassFileTransformer() {
+        @Override
+        public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined,
+                                 ProtectionDomain protectionDomain, byte[] classfileBuffer) {
+            if ("net.minecraft.server.MinecraftServer".equals(className)) {
+                return patchMinecraftServer(classfileBuffer);
+            }
+            if ("net.minecraft.commands.arguments.WorldBorderCommand".equals(className)) {
+                return patchWorldBorderCommand(classfileBuffer);
+            }
+            return classfileBuffer;
+        }
+    }, true);
+    getLogger().info("字节码转换器已注册，等待服务器启动...");
 }
 
+    private byte[] patchMinecraftServer(byte[] classBytes) {
+    ClassReader cr = new ClassReader(classBytes);
+    ClassWriter cw = new ClassWriter(cr, ClassWriter.COMPUTE_MAXS);
+    ClassVisitor cv = new ClassVisitor(Opcodes.ASM9, cw) {
+        @Override
+        public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
+            MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions);
+            if ("getAbsoluteMaxWorldSize".equals(name) && "()I".equals(descriptor)) {
+                return new MethodVisitor(Opcodes.ASM9, mv) {
+                    @Override
+                    public void visitIntInsn(int opcode, int operand) {
+                        if (opcode == Opcodes.SIPUSH && operand == 30000000) {
+                            super.visitIntInsn(Opcodes.LDC, 2147483646);
+                        } else {
+                            super.visitIntInsn(opcode, operand);
+                        }
+                    }
+
+                    @Override
+                    public void visitLdcInsn(Object value) {
+                        if (value instanceof Integer && (int) value == 30000000) {
+                            super.visitLdcInsn(2147483646);
+                        } else {
+                            super.visitLdcInsn(value);
+                        }
+                    }
+                };
+            }
+            return mv;
+        }
+    };
+    cr.accept(cv, 0);
+    return cw.toByteArray();
+}
+
+private byte[] patchWorldBorderCommand(byte[] classBytes) {
+    ClassReader cr = new ClassReader(classBytes);
+    ClassWriter cw = new ClassWriter(cr, ClassWriter.COMPUTE_MAXS);
+    ClassVisitor cv = new ClassVisitor(Opcodes.ASM9, cw) {
+        @Override
+        public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
+            MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions);
+            return new MethodVisitor(Opcodes.ASM9, mv) {
+                @Override
+                public void visitLdcInsn(Object value) {
+                    if (value instanceof Double) {
+                        double d = (Double) value;
+                        if (d == 5.9999968E7) {
+                            super.visitLdcInsn(2147483646.0);
+                            return;
+                        } else if (d == 2.9999984E7) {
+                            super.visitLdcInsn(1073741823.0);
+                            return;
+                        }
+                    }
+                    super.visitLdcInsn(value);
+                }
+            };
+        }
+    };
+    cr.accept(cv, 0);
+    return cw.toByteArray();
+}
+
+    private Instrumentation getInstrumentation() {
+    try {
+        // 通过 CraftServer 获取 MinecraftServer 实例
+        CraftServer craftServer = (CraftServer) Bukkit.getServer();
+        Object mcServer = craftServer.getServer(); // net.minecraft.server.MinecraftServer
+        Method getInstrumentation = mcServer.getClass().getMethod("getInstrumentation");
+        return (Instrumentation) getInstrumentation.invoke(mcServer);
+    } catch (Exception e) {
+        getLogger().log(Level.SEVERE, "获取 Instrumentation 失败", e);
+        return null;
+    }
+    }
+    
     @Override
     public void onEnable() {
 
