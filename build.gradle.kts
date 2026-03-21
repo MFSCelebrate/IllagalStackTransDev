@@ -7,11 +7,11 @@ plugins {
     idea
     eclipse
     id("io.papermc.paperweight.userdev") version "2.0.0-beta.18"
-    id("com.github.johnrengelman.shadow") version "8.1.1" // 用于打包 Mixin 库
+    id("com.github.johnrengelman.shadow") version "8.1.1" // 用于打包 ASM 等依赖
 }
 
 repositories {
-    mavenCentral() // 官方仓库作为后备
+    mavenCentral()
     maven {
         name = "OSS Sonatype"
         url = uri("https://oss.sonatype.org/content/repositories/snapshots/")
@@ -36,10 +36,6 @@ repositories {
         name = "JitPack"
         url = uri("https://jitpack.io")
     }
-    maven { // Mixin 仓库
-        name = "SpongePowered"
-        url = uri("https://repo.spongepowered.org/maven/")
-    }
 }
 
 dependencies {
@@ -63,19 +59,10 @@ dependencies {
         exclude(group = "org.spigotmc", module = "spigot-api")
     }
 
-    // Mixin 相关依赖（编译时使用，运行时由 Ignite 提供）
-    implementation("org.spongepowered:mixin:0.8.7")
-    annotationProcessor("org.spongepowered:mixin:0.8.7")
-
-    // Gson 依赖（同时用于编译和注解处理）
-    implementation("com.google.code.gson:gson:2.10.1")
-    annotationProcessor("com.google.code.gson:gson:2.10.1")
-
-    // Guava 依赖（用于注解处理）
-    annotationProcessor("com.google.guava:guava:33.5.0-jre")
-
-    // 新增：为注解处理器添加 ASM 依赖
-    annotationProcessor("org.ow2.asm:asm-util:9.8")
+    // ASM 依赖，用于运行时字节码修改
+    implementation("org.ow2.asm:asm:9.7")
+    implementation("org.ow2.asm:asm-commons:9.7")
+    implementation("org.ow2.asm:asm-util:9.7") // 可选，用于调试
 }
 
 java {
@@ -88,7 +75,6 @@ configurations.all {
     attributes {
         attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 21)
     }
-    // 确保依赖解析时优先使用指定版本（如有冲突）
     resolutionStrategy {
         force("com.google.code.gson:gson:2.10.1")
     }
@@ -105,24 +91,16 @@ tasks.compileJava {
 version = "3.1.0-IllagalStackTrans"
 
 tasks.processResources {
-    filesMatching("plugin.yml") {
+    // 改为处理 paper-plugin.yml（如果仍使用 plugin.yml 则保留，建议使用 paper-plugin.yml）
+    filesMatching("paper-plugin.yml") {
         expand("version" to project.version)
     }
 }
 
 tasks.shadowJar {
     archiveClassifier.set("")
-    // 暂时注释 relocate，确保 Mixin 类在原始包名下可用
-    // relocate("org.spongepowered.asm", "main.java.me.dniym.mixin.asm")
-    // Mixin Version
+    // 将 ASM 重定位到插件私有包，避免与服务器自带 ASM 冲突
+    relocate("org.objectweb.asm", "main.java.me.dniym.libs.asm")
+    // 确保不包含其他不必要的依赖
+    minimize()
 }
-
-// 重要：我们不再让 assemble 或 build 任务依赖 shadowJar。
-// 如果您需要生成最终的插件 JAR，请直接运行 `./gradlew shadowJar` 命令。
-// 这样，Gradle 就不会在标准构建生命周期中尝试解决循环依赖。
-// 如果您仍然希望通过 `./gradlew build` 触发 shadowJar，可以尝试下面的配置，但风险较高：
-/*
-tasks.build {
-    dependsOn(tasks.shadowJar)
-}
-*/
