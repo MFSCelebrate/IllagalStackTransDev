@@ -9,6 +9,7 @@ import org.spongepowered.asm.mixin.injection.ModifyConstant;
 public class MinecraftServerMixin {
     @ModifyConstant(method = "*", constant = @Constant(intValue = 30000000))
     private int modifyMaxWorldSize(int original) {
+        System.out.println("[IllegalStack] Mixin applied! Modifying max world size from " + original + " to 2147483646");
         return 2147483646;
     }
 }
