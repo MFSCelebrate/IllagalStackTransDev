@@ -548,7 +548,6 @@ public class IllegalStack extends JavaPlugin implements Listener {
         checkForFoliaServer();
 
         // ---------- 注册命令（使用 CommandMap）----------
-        // 注意：这些命令类现在继承自 org.bukkit.command.Command
         IllegalStackCommand illegalStackCommand = new IllegalStackCommand("istack", "允许使用 /istack 指令调试该插件。", "/istack", Arrays.asList("istack"));
         getServer().getCommandMap().register("illegalstack", illegalStackCommand);
 
@@ -3100,4 +3099,4 @@ public class IllegalStack extends JavaPlugin implements Listener {
         }
         dir.delete();
     }
-                           }
+                                                   }
