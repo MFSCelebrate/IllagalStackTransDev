@@ -1,6 +1,6 @@
 package main.java.me.dniym.mixins;
 
-import net.minecraft.commands.WorldBorderCommand;
+import net.minecraft.server.commands.WorldBorderCommand
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.ModifyConstant;
