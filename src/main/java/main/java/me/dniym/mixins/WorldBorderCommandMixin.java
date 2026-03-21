@@ -7,12 +7,12 @@ import org.spongepowered.asm.mixin.injection.ModifyConstant;
 
 @Mixin(WorldBorderCommand.class)
 public class WorldBorderCommandMixin {
-    @ModifyConstant(method = "*", constant = @Constant(doubleValue = 5.9999968E7))
+    @ModifyConstant(method = "*", constant = @Constant(doubleValue = 5.9999968E7), remap = false)
     private double modifyMaxSize(double original) {
         return 2147483646.0;
     }
 
-    @ModifyConstant(method = "*", constant = @Constant(doubleValue = 2.9999984E7))
+    @ModifyConstant(method = "*", constant = @Constant(doubleValue = 2.9999984E7), remap = false)
     private double modifyHalfMaxSize(double original) {
         return 1073741823.0;
     }
