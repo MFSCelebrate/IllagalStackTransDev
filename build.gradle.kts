@@ -58,11 +58,8 @@ dependencies {
     compileOnly("com.github.brcdev-minecraft:shopgui-api:3.0.0") {
         exclude(group = "org.spigotmc", module = "spigot-api")
     }
-
-    // ASM 依赖，用于运行时字节码修改
-    implementation("org.ow2.asm:asm:9.7")
-    implementation("org.ow2.asm:asm-commons:9.7")
-    implementation("org.ow2.asm:asm-util:9.7") // 可选，用于调试
+    compileOnly("org.spongepowered:mixin:0.8.7")
+    annotationProcessor("org.spongepowered:mixin:0.8.7")
 }
 
 java {
